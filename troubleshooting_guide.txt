@@ -1,0 +1,1892 @@
+
+PRODUCTION-GRADE RAG TROUBLESHOOTING PLAYBOOK — UBUNTU
+Follow this order during an incident.
+
+1. CONTAINER
+  Is it running?
+Description:
+   Show all services in the current Compose project.
+Expected:
+     All important services should show Up.
+docker compose ps
+
+Description:
+  Show all services including stopped/exited containers.
+Expected:
+  Useful for spotting crashed services.
+docker compose ps -a
+
+Description:
+   Show all running Docker containers globally.
+Expected:
+  Containers such as:
+# rag-backend
+# rag-frontend
+# prometheus
+# alertmanager
+# prometheus-mcp
+# opensearch-mcp
+# observability-agent
+# otel-collector
+# data-prepper
+# cadvisor
+docker ps
+
+
+# Description:
+# Show exited containers.
+# Expected:
+# Ideally empty.
+docker ps -a --filter status=exited
+
+
+# Description:
+# Show restarting containers.
+# Expected:
+# Ideally empty.
+docker ps --filter status=restarting
+
+
+# Description:
+# Show unhealthy containers.
+# Expected:
+# Ideally empty.
+docker ps --filter health=unhealthy
+
+
+# Description:
+# Check restart count for rag-backend.
+# Expected:
+# Usually 0.
+docker inspect rag-backend --format '{{.RestartCount}}'
+
+
+# Description:
+# Check restart count for observability-agent.
+# Expected:
+# Usually 0.
+docker inspect observability-agent --format '{{.RestartCount}}'
+
+
+# Description:
+# Check restart count for prometheus-mcp.
+# Expected:
+# Usually 0.
+docker inspect prometheus-mcp --format '{{.RestartCount}}'
+
+
+# Description:
+# Restart one unhealthy service.
+# Expected:
+# Service restarts successfully.
+docker compose restart rag-backend
+
+
+# Description:
+# Recreate one service if restart is not enough.
+# Expected:
+# Container is replaced and starts again.
+docker compose up -d --force-recreate --no-deps rag-backend
+
+
+# Description:
+# Restart the entire stack if necessary.
+# Expected:
+# All Compose services restart.
+docker compose restart
+
+
+# =====================================================================
+# 2. HEALTH
+# Is the process healthy?
+# =====================================================================
+
+# Description:
+# Check RAG backend health endpoint.
+# Expected:
+# HTTP 200 / healthy JSON.
+curl http://localhost:8000/health
+
+
+# Description:
+# Show HTTP headers for backend health.
+# Expected:
+# HTTP/1.1 200 OK
+curl -i http://localhost:8000/health
+
+
+# Description:
+# Check observability-agent health.
+# Expected:
+# {"status":"healthy"}
+curl http://localhost:8003/health
+
+
+# Description:
+# Check Prometheus health.
+# Expected:
+# Prometheus Server is Healthy.
+curl http://localhost:9090/-/healthy
+
+
+# Description:
+# Check Prometheus readiness.
+# Expected:
+# Prometheus Server is Ready.
+curl http://localhost:9090/-/ready
+
+
+# Description:
+# Check Alertmanager health.
+# Expected:
+# OK
+curl http://localhost:9093/-/healthy
+
+
+# Description:
+# Check Alertmanager readiness.
+# Expected:
+# OK
+curl http://localhost:9093/-/ready
+
+
+# Description:
+# Check Streamlit frontend.
+# Expected:
+# HTTP response.
+curl -I http://localhost:8501
+
+
+# Description:
+# Check Docker-reported health status for backend.
+# Expected:
+# healthy
+docker inspect rag-backend --format '{{.State.Health.Status}}'
+
+
+# Description:
+# Check Docker-reported health for observability-agent.
+# Expected:
+# healthy
+docker inspect observability-agent --format '{{.State.Health.Status}}'
+
+
+# 3. NETWORK
+  Can services resolve/reach each other?
+
+# Description:
+# List Docker networks.
+# Expected:
+# production-grade-rag_rag-network should exist.
+docker network ls
+
+
+# Description:
+# Inspect Prometheus network membership.
+# Expected:
+# production-grade-rag_rag-network.
+docker inspect prometheus --format '{{json .NetworkSettings.Networks}}'
+
+
+# Description:
+# Inspect Alertmanager network membership.
+# Expected:
+# Same network as Prometheus.
+docker inspect alertmanager --format '{{json .NetworkSettings.Networks}}'
+
+
+# Description:
+# Inspect observability-agent network membership.
+# Expected:
+# Same internal application network.
+docker inspect observability-agent --format '{{json .NetworkSettings.Networks}}'
+
+
+# Description:
+# Inspect entire RAG Docker network.
+# Expected:
+# Attached containers and IP addresses.
+docker network inspect production-grade-rag_rag-network
+
+
+# Description:
+# Test Alertmanager reachability from Prometheus.
+# Expected:
+# OK
+docker compose exec prometheus wget -qO- http://alertmanager:9093/-/ready
+
+
+# Description:
+# Resolve prometheus-mcp from observability-agent.
+# Expected:
+# Internal Docker IP address.
+docker compose exec observability-agent python -c "import socket; print(socket.gethostbyname('prometheus-mcp'))"
+
+
+# Description:
+# Resolve opensearch-mcp from observability-agent.
+# Expected:
+# Internal Docker IP address.
+docker compose exec observability-agent python -c "import socket; print(socket.gethostbyname('opensearch-mcp'))"
+
+
+# Description:
+# Check Prometheus MCP URL inside observability-agent.
+# Expected:
+# http://prometheus-mcp:8001/mcp
+docker compose exec observability-agent python -c "import os; print(os.getenv('PROMETHEUS_MCP_URL'))"
+
+
+# Description:
+# Check OpenSearch MCP URL.
+# Expected:
+# http://opensearch-mcp:8002/mcp
+docker compose exec observability-agent python -c "import os; print(os.getenv('OPENSEARCH_MCP_URL'))"
+
+
+# Description:
+# Show listening ports on Ubuntu.
+# Expected:
+# Ports such as 8000, 8003, 9090, 9093, 4317, 4318, 9464.
+sudo ss -tulpn
+
+
+# Description:
+# Filter only important application ports.
+# Expected:
+# Listening entries for your stack.
+sudo ss -tulpn | grep -E ':8000|:8001|:8002|:8003|:8080|:8501|:9090|:9093|:4317|:4318|:9464'
+
+
+# 4. APPLICATION LOGS
+# Any Python/FastAPI/retrieval/LLM errors?
+
+# Description:
+# Show recent backend logs.
+# Expected:
+# Requests, retrieval, LLM activity, errors.
+docker compose logs --tail=200 rag-backend
+
+
+# Description:
+# Follow backend logs live.
+# Expected:
+# Real-time log stream.
+docker compose logs -f rag-backend
+
+
+# Description:
+# Show backend logs from the last 10 minutes.
+# Expected:
+# Recent activity only.
+docker compose logs --since=10m rag-backend
+
+
+# Description:
+# Find backend errors quickly.
+# Expected:
+# Error/exception lines only.
+docker compose logs --tail=500 rag-backend | grep -Ei 'error|exception|traceback|failed'
+
+
+# Description:
+# Follow only backend errors live.
+# Expected:
+# New error lines only.
+docker compose logs -f rag-backend | grep --line-buffered -Ei 'error|exception|traceback|failed'
+
+
+# Description:
+# Check observability-agent logs.
+# Expected:
+# LLM/MCP/tool activity and errors.
+docker compose logs --tail=300 observability-agent
+
+
+# Description:
+# Search agent errors.
+# Expected:
+# Ideally no unexpected exceptions.
+docker compose logs --tail=500 observability-agent | grep -Ei 'error|exception|traceback|failed'
+
+
+# Description:
+# Check OpenSearch MCP logs.
+# Expected:
+# Search/tool activity.
+docker compose logs --tail=200 opensearch-mcp
+
+
+# Description:
+# Search OpenSearch MCP failures.
+# Expected:
+# Ideally none.
+docker compose logs --tail=500 opensearch-mcp | grep -Ei 'error|failed|exception|timeout|unauthorized|forbidden'
+
+
+# Description:
+# Check Prometheus MCP logs.
+# Expected:
+# Tool calls and MCP traffic.
+docker compose logs --tail=200 prometheus-mcp
+
+
+# Description:
+# Check OTel Collector logs.
+# Expected:
+# Telemetry pipeline activity.
+docker compose logs --tail=300 otel-collector
+
+
+# Description:
+# Search OTel Collector for failures.
+# Expected:
+# Ideally no exporter failures.
+docker compose logs --tail=500 otel-collector | grep -Ei 'error|failed|retry|timeout|refused'
+
+
+# Description:
+# Check Data Prepper logs.
+# Expected:
+# Trace ingestion/export information.
+docker compose logs --tail=300 data-prepper
+
+
+# =====================================================================
+# 5. METRICS
+# CPU, memory, request rate, latency, errors?
+# =====================================================================
+
+# Description:
+# Show live container CPU/RAM/network usage.
+# Expected:
+# Continuous resource table.
+docker stats
+
+
+# Description:
+# One-time resource snapshot.
+# Expected:
+# CPU and RAM usage for each container.
+docker stats --no-stream
+
+
+# Description:
+# Monitor rag-backend only.
+# Expected:
+# CPU %, memory usage, memory limit, I/O.
+docker stats rag-backend --no-stream
+
+
+# Description:
+# Compact resource table.
+# Expected:
+# NAME CPU% MEM USAGE/LIMIT MEM%
+docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}'
+
+
+# Description:
+# Query rag-backend CPU from Prometheus.
+# Expected:
+# Numeric CPU percentage.
+curl 'http://localhost:9090/api/v1/query?query=100%20*%20sum(rate(container_cpu_usage_seconds_total%7Bcontainer_label_com_docker_compose_service%3D%22rag-backend%22%7D%5B2m%5D))'
+
+
+# Description:
+# Query backend memory usage in GiB.
+# Expected:
+# Numeric GiB value.
+curl 'http://localhost:9090/api/v1/query?query=max(container_memory_working_set_bytes%7Bcontainer_label_com_docker_compose_service%3D%22rag-backend%22,container!%3D%22%22%7D)%20%2F%201024%20%2F%201024%20%2F%201024'
+
+
+# Description:
+# Query backend memory limit in GiB.
+# Expected:
+# Configured limit, e.g. 2.
+curl 'http://localhost:9090/api/v1/query?query=max(container_spec_memory_limit_bytes%7Bcontainer_label_com_docker_compose_service%3D%22rag-backend%22,container!%3D%22%22%7D)%20%2F%201024%20%2F%201024%20%2F%201024'
+
+
+# Description:
+# Inspect OTel-exported metrics.
+# Expected:
+# Prometheus text-format metrics.
+curl http://localhost:9464/metrics
+
+
+# Description:
+# Measure backend health endpoint latency.
+# Expected:
+# HTTP 200 plus total request duration.
+curl -s -o /dev/null -w 'HTTP %{http_code} total=%{time_total}s\n' http://localhost:8000/health
+
+
+# Description:
+# Measure observability-agent health latency.
+# Expected:
+# HTTP status and total time.
+curl -s -o /dev/null -w 'HTTP %{http_code} total=%{time_total}s\n' http://localhost:8003/health
+
+
+# Description:
+# Host CPU/load.
+# Expected:
+# 1, 5, 15-minute load averages.
+uptime
+
+
+# Description:
+# Host memory.
+# Expected:
+# total, used, available RAM.
+free -h
+
+
+# Description:
+# Host disk usage.
+# Expected:
+# filesystem usage percentages.
+df -h
+
+
+# =====================================================================
+# 6. PROMETHEUS TARGETS
+# Is telemetry being scraped?
+# =====================================================================
+
+# Description:
+# Retrieve all Prometheus scrape targets.
+# Expected:
+# activeTargets JSON.
+curl http://localhost:9090/api/v1/targets
+
+
+# Description:
+# Search for unhealthy targets.
+# Expected:
+# Ideally no "health":"down".
+curl http://localhost:9090/api/v1/targets | grep -i '"health":"down"'
+
+
+# Description:
+# Check Prometheus UI manually.
+# Expected:
+# Targets page shows UP.
+# Browser:
+# http://localhost:9090/targets
+
+
+# Description:
+# Verify Prometheus configuration.
+# Expected:
+# SUCCESS.
+docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+
+
+# Description:
+# Inspect currently loaded Prometheus configuration.
+# Expected:
+# scrape_configs and alerting configuration.
+curl http://localhost:9090/api/v1/status/config
+
+
+# Description:
+# Verify OTel exporter endpoint is returning metrics.
+# Expected:
+# Prometheus metrics.
+curl http://localhost:9464/metrics
+
+
+# Description:
+# Check cAdvisor status.
+# Expected:
+# Up / healthy.
+docker compose ps cadvisor
+
+
+# Description:
+# Check cAdvisor logs.
+# Expected:
+# No repeated collection errors.
+docker compose logs --tail=100 cadvisor
+
+
+# =====================================================================
+# 7. PROMETHEUS RULES
+# Is a threshold violated?
+# =====================================================================
+
+# Description:
+# Validate all alert rules.
+# Expected:
+# SUCCESS.
+docker compose exec prometheus promtool check rules /etc/prometheus/alert_rules.yml
+
+
+# Description:
+# Show all loaded Prometheus rules.
+# Expected:
+# JSON containing alert rules.
+curl http://localhost:9090/api/v1/rules
+
+
+# Description:
+# Find CPU alert rule.
+# Expected:
+# RAGBackendHighCPU definition.
+curl http://localhost:9090/api/v1/rules | grep -i 'RAGBackendHighCPU'
+
+
+# Description:
+# Retrieve currently pending/firing alerts.
+# Expected:
+# data.alerts array.
+curl http://localhost:9090/api/v1/alerts
+
+
+# Description:
+# Show only firing alerts.
+# Expected:
+# Firing alert entries.
+curl http://localhost:9090/api/v1/alerts | grep -i '"state":"firing"'
+
+
+# Description:
+# Find RAGBackendHighCPU alert.
+# Expected:
+# Its state, value, annotations if active.
+curl http://localhost:9090/api/v1/alerts | grep -i 'RAGBackendHighCPU'
+
+
+# Description:
+# Inspect local CPU rule source.
+# Expected:
+# Current expr, for, labels, annotations.
+grep -nA10 -B3 'RAGBackendHighCPU' prometheus-alert-rules.yml
+
+
+# Description:
+# Inspect memory rules.
+# Expected:
+# Memory alert definitions.
+grep -nA10 -B3 'RAGBackendHighMemory' prometheus-alert-rules.yml
+
+
+# Description:
+# Inspect error-rate rules.
+# Expected:
+# Error alert definitions.
+grep -nA10 -B3 'RAGHighErrorRate' prometheus-alert-rules.yml
+
+
+# Description:
+# Print exact rules loaded inside Prometheus container.
+# Expected:
+# Current mounted alert rule file.
+docker compose exec prometheus cat /etc/prometheus/alert_rules.yml
+
+
+# Description:
+# Reload Prometheus after rule changes.
+# Expected:
+# Prometheus recreated and running.
+docker compose up -d --force-recreate prometheus
+
+
+# =====================================================================
+# 8. ALERTMANAGER
+# Was the firing alert delivered?
+# =====================================================================
+
+# Description:
+# Confirm Prometheus knows about Alertmanager.
+# Expected:
+# activeAlertmanagers includes alertmanager:9093.
+curl http://localhost:9090/api/v1/alertmanagers
+
+
+# Description:
+# Test connectivity from Prometheus to Alertmanager.
+# Expected:
+# OK
+docker compose exec prometheus wget -qO- http://alertmanager:9093/-/ready
+
+
+# Description:
+# Retrieve Alertmanager active alerts.
+# Expected:
+# Active alert JSON array.
+# [] means Alertmanager currently has none.
+curl http://localhost:9093/api/v2/alerts
+
+
+# Description:
+# Check Alertmanager readiness.
+# Expected:
+# OK
+curl http://localhost:9093/-/ready
+
+
+# Description:
+# Check Alertmanager health.
+# Expected:
+# OK
+curl http://localhost:9093/-/healthy
+
+
+# Description:
+# Validate Alertmanager configuration.
+# Expected:
+# SUCCESS.
+docker compose exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+
+
+# Description:
+# Inspect Alertmanager logs.
+# Expected:
+# No webhook delivery failures.
+docker compose logs --tail=300 alertmanager
+
+
+# Description:
+# Follow Alertmanager logs live.
+# Expected:
+# Notification activity.
+docker compose logs -f alertmanager
+
+
+# Description:
+# Show notification repeat interval.
+# Expected:
+# e.g. repeat_interval: 30m
+grep -n 'repeat_interval' alertmanager.yml
+
+
+# Description:
+# Print Alertmanager config currently mounted in container.
+# Expected:
+# route, receiver, webhook, repeat_interval.
+docker compose exec alertmanager cat /etc/alertmanager/alertmanager.yml
+
+
+# =====================================================================
+# 9. OBSERVABILITY AGENT
+# Did it receive /alerts/prometheus?
+# =====================================================================
+
+# Description:
+# Check agent health.
+# Expected:
+# healthy.
+curl http://localhost:8003/health
+
+
+# Description:
+# Find incoming Prometheus alert webhooks.
+# Expected:
+# POST /alerts/prometheus HTTP/1.1 200 OK
+docker compose logs --tail=500 observability-agent | grep -i '/alerts/prometheus'
+
+
+# Description:
+# Follow alert webhooks live.
+# Expected:
+# New POST /alerts/prometheus calls.
+docker compose logs -f observability-agent | grep --line-buffered -i '/alerts/prometheus'
+
+
+# Description:
+# Show agent logs around alert processing.
+# Expected:
+# Portkey + MCP calls after webhook.
+docker compose logs --tail=300 observability-agent
+
+
+# Description:
+# Search agent for alert-processing failures.
+# Expected:
+# Ideally no failures.
+docker compose logs --tail=500 observability-agent | grep -Ei 'alert|error|failed|exception'
+
+
+# Description:
+# Test webhook manually.
+# Expected:
+# HTTP 200 response.
+curl -X POST http://localhost:8003/alerts/prometheus \
+  -H 'Content-Type: application/json' \
+  -d '{"alerts":[{"status":"firing","labels":{"alertname":"TEST_RAG_HIGH_CPU","severity":"warning","service":"rag-backend","category":"cpu"},"annotations":{"summary":"Test CPU warning","description":"Manual alert pipeline test."}}]}'
+
+
+# =====================================================================
+# 10. MCP INVESTIGATION
+# Did Prometheus/OpenSearch tools execute?
+# =====================================================================
+
+# Description:
+# Verify Prometheus MCP service is running.
+# Expected:
+# Up.
+docker compose ps prometheus-mcp
+
+
+# Description:
+# Verify OpenSearch MCP service is running.
+# Expected:
+# Up.
+docker compose ps opensearch-mcp
+
+
+# Description:
+# Inspect Prometheus MCP logs.
+# Expected:
+# MCP requests after agent invocation.
+docker compose logs --tail=300 prometheus-mcp
+
+
+# Description:
+# Inspect OpenSearch MCP logs.
+# Expected:
+# OpenSearch MCP requests after investigation.
+docker compose logs --tail=300 opensearch-mcp
+
+
+# Description:
+# Confirm observability agent loaded all MCP tools.
+# Expected:
+# Prometheus tools: 36
+# OpenSearch tools: 15
+# Total MCP tools: 51
+docker compose logs --tail=200 observability-agent
+
+
+# Description:
+# Confirm alert-specific Prometheus tools were registered.
+# Expected:
+# get_active_alerts
+# get_alert_by_name
+# get_alert_summary
+docker compose logs --tail=200 observability-agent | grep -E 'get_active_alerts|get_alert_by_name|get_alert_summary'
+
+
+# Description:
+# Verify alert tool functions exist inside prometheus-mcp.
+# Expected:
+# True
+# True
+# True
+docker compose exec prometheus-mcp python -c "import prometheus_mcp.server as s; print(hasattr(s,'get_active_alerts')); print(hasattr(s,'get_alert_by_name')); print(hasattr(s,'get_alert_summary'))"
+
+
+# Description:
+# Confirm which server.py the running container imported.
+# Expected:
+# /app/prometheus_mcp/server.py
+docker compose exec prometheus-mcp python -c "import prometheus_mcp.server as s; print(s.__file__)"
+
+
+# Description:
+# Verify MCP tool definitions appear before mcp.run.
+# Expected:
+# Tool definitions line numbers first, mcp.run last.
+grep -nE 'get_active_alerts|get_alert_by_name|get_alert_summary|if __name__|mcp.run' prometheus_mcp/server.py
+
+
+# Description:
+# Ask observability agent directly about active alerts.
+# Expected:
+# Agent should call get_active_alerts.
+curl -X POST http://localhost:8003/observe \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Are there any active Prometheus alerts right now? Use the Prometheus alert tool."}'
+
+
+# Description:
+# Ask about a specific alert.
+# Expected:
+# Agent should use get_alert_by_name.
+curl -X POST http://localhost:8003/observe \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Has RAGBackendHighCPU fired? Show state, severity, value and start time."}'
+
+
+# Description:
+# Confirm MCP traffic from agent logs.
+# Expected:
+# POST http://prometheus-mcp:8001/mcp 200 OK
+# POST http://opensearch-mcp:8002/mcp 200 OK
+docker compose logs --tail=300 observability-agent | grep -Ei 'prometheus-mcp|opensearch-mcp'
+
+
+# =====================================================================
+# 11. NOTIFICATION
+# Was the email actually sent?
+# =====================================================================
+
+# Description:
+# Search agent logs for successful email delivery.
+# Expected:
+# Alert email successfully sent for <alert-name>
+docker compose logs --tail=500 observability-agent | grep -i 'Alert email successfully sent'
+
+
+# Description:
+# Search specifically for CPU alert email.
+# Expected:
+# Alert email successfully sent for RAGBackendHighCPU
+docker compose logs --tail=500 observability-agent | grep -i 'RAGBackendHighCPU'
+
+
+# Description:
+# Check for SMTP/email failures.
+# Expected:
+# Ideally no errors.
+docker compose logs --tail=500 observability-agent | grep -Ei 'smtp|email|authentication|failed|error'
+
+
+# Description:
+# Verify SMTP variables exist without exposing secrets.
+# Expected:
+# SMTP configured
+docker compose exec observability-agent python -c "import os; print('SMTP configured' if os.getenv('SMTP_PASSWORD') and os.getenv('ALERT_EMAIL_TO') else 'SMTP missing')"
+
+
+# Description:
+# Check whether SMTP password exists without printing it.
+# Expected:
+# True
+docker compose exec observability-agent python -c "import os; print(bool(os.getenv('SMTP_PASSWORD')))"
+
+
+# Description:
+# Perform direct Gmail SMTP test.
+# This bypasses Prometheus/Alertmanager/agent logic.
+# Expected:
+# EMAIL SENT
+docker compose exec observability-agent python -c "import os,smtplib; from email.message import EmailMessage; m=EmailMessage(); m['From']=os.environ['ALERT_EMAIL_FROM']; m['To']=os.environ['ALERT_EMAIL_TO']; m['Subject']='RAG Observability Email Test'; m.set_content('Gmail SMTP is working correctly for the RAG observability system.'); s=smtplib.SMTP(os.environ.get('SMTP_HOST','smtp.gmail.com'),int(os.environ.get('SMTP_PORT','587')),timeout=20); s.starttls(); s.login(os.environ['SMTP_USERNAME'],os.environ['SMTP_PASSWORD']); s.send_message(m); s.quit(); print('EMAIL SENT')"
+
+
+# =====================================================================
+# COMPLETE END-TO-END INCIDENT CHECK
+# Run these in this exact order.
+# =====================================================================
+
+# 1. Containers
+docker compose ps
+
+# 2. Health
+curl http://localhost:8000/health
+curl http://localhost:8003/health
+curl http://localhost:9090/-/healthy
+curl http://localhost:9093/-/ready
+
+# 3. Network
+docker compose exec prometheus wget -qO- http://alertmanager:9093/-/ready
+docker compose exec observability-agent python -c "import socket; print(socket.gethostbyname('prometheus-mcp')); print(socket.gethostbyname('opensearch-mcp'))"
+
+# 4. Application logs
+docker compose logs --tail=300 rag-backend | grep -Ei 'error|exception|traceback|failed'
+
+# 5. Metrics
+docker stats --no-stream
+curl http://localhost:9464/metrics
+
+# 6. Prometheus targets
+curl http://localhost:9090/api/v1/targets
+
+# 7. Prometheus rules / alerts
+docker compose exec prometheus promtool check rules /etc/prometheus/alert_rules.yml
+curl http://localhost:9090/api/v1/alerts
+
+# 8. Alertmanager
+curl http://localhost:9090/api/v1/alertmanagers
+curl http://localhost:9093/api/v2/alerts
+
+# 9. Observability agent webhook
+docker compose logs --tail=300 observability-agent | grep -i '/alerts/prometheus'
+
+# 10. MCP investigation
+docker compose logs --tail=300 observability-agent | grep -Ei 'prometheus-mcp|opensearch-mcp'
+
+# 11. Notification
+docker compose logs --tail=300 observability-agent | grep -i 'Alert email successfully sent'
+
+                      
+                      WINDOWS COMMANDS
+REM =====================================================================
+REM PRODUCTION-GRADE RAG TROUBLESHOOTING PLAYBOOK — WINDOWS CMD
+REM Follow this order during an incident.
+REM =====================================================================
+
+
+REM =====================================================================
+REM 1. CONTAINER
+REM Is it running?
+REM =====================================================================
+
+REM Description:
+REM Show all services in the current Compose project.
+REM Expected:
+REM All important services should show Up.
+docker compose ps
+
+
+REM Description:
+REM Show all services including stopped/exited containers.
+REM Expected:
+REM Useful for spotting crashed services.
+docker compose ps -a
+
+
+REM Description:
+REM Show all running Docker containers globally.
+REM Expected:
+REM rag-backend, rag-frontend, prometheus, alertmanager,
+REM prometheus-mcp, opensearch-mcp, observability-agent,
+REM otel-collector, data-prepper, cadvisor.
+docker ps
+
+
+REM Description:
+REM Show exited containers.
+REM Expected:
+REM Ideally empty.
+docker ps -a --filter status=exited
+
+
+REM Description:
+REM Show restarting containers.
+REM Expected:
+REM Ideally empty.
+docker ps --filter status=restarting
+
+
+REM Description:
+REM Show unhealthy containers.
+REM Expected:
+REM Ideally empty.
+docker ps --filter health=unhealthy
+
+
+REM Description:
+REM Check restart count for rag-backend.
+REM Expected:
+REM Usually 0.
+docker inspect rag-backend --format "{{.RestartCount}}"
+
+
+REM Description:
+REM Check restart count for observability-agent.
+REM Expected:
+REM Usually 0.
+docker inspect observability-agent --format "{{.RestartCount}}"
+
+
+REM Description:
+REM Check restart count for prometheus-mcp.
+REM Expected:
+REM Usually 0.
+docker inspect prometheus-mcp --format "{{.RestartCount}}"
+
+
+REM Description:
+REM Restart backend.
+REM Expected:
+REM rag-backend restarts successfully.
+docker compose restart rag-backend
+
+
+REM Description:
+REM Recreate backend if restart is not enough.
+REM Expected:
+REM New rag-backend container starts.
+docker compose up -d --force-recreate --no-deps rag-backend
+
+
+REM Description:
+REM Restart whole stack.
+REM Expected:
+REM All services restart.
+docker compose restart
+
+
+
+REM 2. HEALTH
+REM Is the process healthy?
+
+REM Description:
+REM Check RAG backend health.
+REM Expected:
+REM HTTP 200 / healthy JSON.
+curl http://localhost:8000/health
+
+
+REM Description:
+REM Show HTTP headers too.
+REM Expected:
+REM HTTP/1.1 200 OK
+curl -i http://localhost:8000/health
+
+
+REM Description:
+REM Check observability-agent health.
+REM Expected:
+REM {"status":"healthy"}
+curl http://localhost:8003/health
+
+
+REM Description:
+REM Check Prometheus health.
+REM Expected:
+REM Prometheus Server is Healthy.
+curl http://localhost:9090/-/healthy
+
+
+REM Description:
+REM Check Prometheus readiness.
+REM Expected:
+REM Prometheus Server is Ready.
+curl http://localhost:9090/-/ready
+
+
+REM Description:
+REM Check Alertmanager health.
+REM Expected:
+REM OK
+curl http://localhost:9093/-/healthy
+
+
+REM Description:
+REM Check Alertmanager readiness.
+REM Expected:
+REM OK
+curl http://localhost:9093/-/ready
+
+
+REM Description:
+REM Check Streamlit frontend.
+REM Expected:
+REM HTTP response.
+curl -I http://localhost:8501
+
+
+REM Description:
+REM Check Docker health for backend.
+REM Expected:
+REM healthy
+docker inspect rag-backend --format "{{.State.Health.Status}}"
+
+
+REM Description:
+REM Check Docker health for observability-agent.
+REM Expected:
+REM healthy
+docker inspect observability-agent --format "{{.State.Health.Status}}"
+
+
+REM =====================================================================
+REM 3. NETWORK
+REM Can services resolve/reach each other?
+REM =====================================================================
+
+REM Description:
+REM List Docker networks.
+REM Expected:
+REM production-grade-rag_rag-network should exist.
+docker network ls
+
+
+REM Description:
+REM Inspect Prometheus network membership.
+REM Expected:
+REM production-grade-rag_rag-network.
+docker inspect prometheus --format "{{json .NetworkSettings.Networks}}"
+
+
+REM Description:
+REM Inspect Alertmanager network membership.
+REM Expected:
+REM Same network as Prometheus.
+docker inspect alertmanager --format "{{json .NetworkSettings.Networks}}"
+
+
+REM Description:
+REM Inspect observability-agent network membership.
+REM Expected:
+REM Same application network.
+docker inspect observability-agent --format "{{json .NetworkSettings.Networks}}"
+
+
+REM Description:
+REM Inspect entire RAG Docker network.
+REM Expected:
+REM Attached containers and IPs.
+docker network inspect production-grade-rag_rag-network
+
+
+REM Description:
+REM Test Alertmanager reachability from Prometheus.
+REM Expected:
+REM OK
+docker compose exec prometheus wget -qO- http://alertmanager:9093/-/ready
+
+
+REM Description:
+REM Resolve prometheus-mcp from observability-agent.
+REM Expected:
+REM Internal Docker IP.
+docker compose exec observability-agent python -c "import socket; print(socket.gethostbyname('prometheus-mcp'))"
+
+
+REM Description:
+REM Resolve opensearch-mcp from observability-agent.
+REM Expected:
+REM Internal Docker IP.
+docker compose exec observability-agent python -c "import socket; print(socket.gethostbyname('opensearch-mcp'))"
+
+
+REM Description:
+REM Check Prometheus MCP URL inside observability-agent.
+REM Expected:
+REM http://prometheus-mcp:8001/mcp
+docker compose exec observability-agent python -c "import os; print(os.getenv('PROMETHEUS_MCP_URL'))"
+
+
+REM Description:
+REM Check OpenSearch MCP URL.
+REM Expected:
+REM http://opensearch-mcp:8002/mcp
+docker compose exec observability-agent python -c "import os; print(os.getenv('OPENSEARCH_MCP_URL'))"
+
+
+REM Description:
+REM Show listening Windows ports.
+REM Expected:
+REM LISTENING entries for your application ports.
+netstat -ano
+
+
+REM Description:
+REM Filter important ports.
+REM Expected:
+REM Entries for 8000, 8001, 8002, 8003, 8080, 8501,
+REM 9090, 9093, 4317, 4318, 9464.
+netstat -ano | findstr ":8000 :8001 :8002 :8003 :8080 :8501 :9090 :9093 :4317 :4318 :9464"
+
+
+REM =====================================================================
+REM 4. APPLICATION LOGS
+REM Any Python/FastAPI/retrieval/LLM errors?
+REM =====================================================================
+
+REM Description:
+REM Show recent backend logs.
+REM Expected:
+REM Requests, retrieval, LLM activity, errors.
+docker compose logs --tail=200 rag-backend
+
+
+REM Description:
+REM Follow backend logs live.
+REM Expected:
+REM Real-time log stream.
+REM CTRL+C to stop.
+docker compose logs -f rag-backend
+
+
+REM Description:
+REM Show backend logs from last 10 minutes.
+REM Expected:
+REM Recent activity only.
+docker compose logs --since=10m rag-backend
+
+
+REM Description:
+REM Find backend errors quickly.
+REM Expected:
+REM Error/exception lines only.
+docker compose logs --tail=500 rag-backend | findstr /i "error exception traceback failed"
+
+
+REM Description:
+REM Check observability-agent logs.
+REM Expected:
+REM LLM/MCP/tool activity.
+docker compose logs --tail=300 observability-agent
+
+
+REM Description:
+REM Search agent errors.
+REM Expected:
+REM Ideally no unexpected errors.
+docker compose logs --tail=500 observability-agent | findstr /i "error exception traceback failed"
+
+
+REM Description:
+REM Check OpenSearch MCP logs.
+REM Expected:
+REM Search/tool activity.
+docker compose logs --tail=200 opensearch-mcp
+
+
+REM Description:
+REM Search OpenSearch MCP failures.
+REM Expected:
+REM Ideally none.
+docker compose logs --tail=500 opensearch-mcp | findstr /i "error failed exception timeout unauthorized forbidden"
+
+
+REM Description:
+REM Check Prometheus MCP logs.
+REM Expected:
+REM MCP traffic.
+docker compose logs --tail=200 prometheus-mcp
+
+
+REM Description:
+REM Check OTel Collector logs.
+REM Expected:
+REM Telemetry pipeline activity.
+docker compose logs --tail=300 otel-collector
+
+
+REM Description:
+REM Search OTel Collector for failures.
+REM Expected:
+REM Ideally none.
+docker compose logs --tail=500 otel-collector | findstr /i "error failed retry timeout refused"
+
+
+REM Description:
+REM Check Data Prepper logs.
+REM Expected:
+REM Trace pipeline activity.
+docker compose logs --tail=300 data-prepper
+
+
+REM =====================================================================
+REM 5. METRICS
+REM CPU, memory, request rate, latency, errors?
+REM =====================================================================
+
+REM Description:
+REM Show live container CPU/RAM/network usage.
+REM Expected:
+REM Continuous resource table.
+docker stats
+
+
+REM Description:
+REM One-time resource snapshot.
+REM Expected:
+REM CPU and RAM usage.
+docker stats --no-stream
+
+
+REM Description:
+REM Monitor only rag-backend.
+REM Expected:
+REM CPU %, memory usage/limit, I/O.
+docker stats rag-backend --no-stream
+
+
+REM Description:
+REM Compact resource table.
+REM Expected:
+REM NAME CPU% MEM USAGE/LIMIT MEM%
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+
+
+REM Description:
+REM Query backend CPU from Prometheus.
+REM Expected:
+REM JSON with numeric CPU value.
+curl "http://localhost:9090/api/v1/query?query=100%20*%20sum(rate(container_cpu_usage_seconds_total%7Bcontainer_label_com_docker_compose_service%3D%22rag-backend%22%7D%5B2m%5D))"
+
+
+REM Description:
+REM Query backend memory usage in GiB.
+REM Expected:
+REM Numeric GiB value.
+curl "http://localhost:9090/api/v1/query?query=max(container_memory_working_set_bytes%7Bcontainer_label_com_docker_compose_service%3D%22rag-backend%22,container!%3D%22%22%7D)%20%2F%201024%20%2F%201024%20%2F%201024"
+
+
+REM Description:
+REM Query backend memory limit in GiB.
+REM Expected:
+REM Configured memory limit.
+curl "http://localhost:9090/api/v1/query?query=max(container_spec_memory_limit_bytes%7Bcontainer_label_com_docker_compose_service%3D%22rag-backend%22,container!%3D%22%22%7D)%20%2F%201024%20%2F%201024%20%2F%201024"
+
+
+REM Description:
+REM Inspect OTel-exported metrics.
+REM Expected:
+REM Prometheus-formatted metrics.
+curl http://localhost:9464/metrics
+
+
+REM Description:
+REM Measure backend HTTP latency.
+REM Expected:
+REM HTTP code and request duration.
+curl -s -o NUL -w "HTTP %{http_code} total=%{time_total}s\n" http://localhost:8000/health
+
+
+REM Description:
+REM Measure observability-agent latency.
+REM Expected:
+REM HTTP code and request duration.
+curl -s -o NUL -w "HTTP %{http_code} total=%{time_total}s\n" http://localhost:8003/health
+
+
+REM =====================================================================
+REM 6. PROMETHEUS TARGETS
+REM Is telemetry being scraped?
+REM =====================================================================
+
+REM Description:
+REM Retrieve all Prometheus scrape targets.
+REM Expected:
+REM activeTargets JSON.
+curl http://localhost:9090/api/v1/targets
+
+
+REM Description:
+REM Search for down targets.
+REM Expected:
+REM Ideally no output.
+curl http://localhost:9090/api/v1/targets | findstr /i """health"":""down"""
+
+
+REM Description:
+REM Validate Prometheus configuration.
+REM Expected:
+REM SUCCESS.
+docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+
+
+REM Description:
+REM Inspect currently loaded Prometheus config.
+REM Expected:
+REM scrape_configs and alerting configuration.
+curl http://localhost:9090/api/v1/status/config
+
+
+REM Description:
+REM Verify OTel exporter is exposing metrics.
+REM Expected:
+REM Prometheus metrics.
+curl http://localhost:9464/metrics
+
+
+REM Description:
+REM Check cAdvisor.
+REM Expected:
+REM Up / healthy.
+docker compose ps cadvisor
+
+
+REM Description:
+REM Check cAdvisor logs.
+REM Expected:
+REM No repeated collection errors.
+docker compose logs --tail=100 cadvisor
+
+
+REM Browser:
+REM http://localhost:9090/targets
+
+
+REM =====================================================================
+REM 7. PROMETHEUS RULES
+REM Is a threshold violated?
+REM =====================================================================
+
+REM Description:
+REM Validate alert rules.
+REM Expected:
+REM SUCCESS.
+docker compose exec prometheus promtool check rules /etc/prometheus/alert_rules.yml
+
+
+REM Description:
+REM Show loaded Prometheus rules.
+REM Expected:
+REM JSON containing all alert rules.
+curl http://localhost:9090/api/v1/rules
+
+
+REM Description:
+REM Find CPU alert rule.
+REM Expected:
+REM RAGBackendHighCPU.
+curl http://localhost:9090/api/v1/rules | findstr /i "RAGBackendHighCPU"
+
+
+REM Description:
+REM Retrieve pending/firing alerts.
+REM Expected:
+REM data.alerts array.
+curl http://localhost:9090/api/v1/alerts
+
+
+REM Description:
+REM Search for firing alerts.
+REM Expected:
+REM Entries containing state:firing.
+curl http://localhost:9090/api/v1/alerts | findstr /i "firing"
+
+
+REM Description:
+REM Find RAGBackendHighCPU specifically.
+REM Expected:
+REM Current alert data if active.
+curl http://localhost:9090/api/v1/alerts | findstr /i "RAGBackendHighCPU"
+
+
+REM Description:
+REM Inspect local CPU rule.
+REM Expected:
+REM Line numbers plus nearby rule configuration.
+findstr /n /i "RAGBackendHighCPU" prometheus-alert-rules.yml
+
+
+REM Description:
+REM Inspect memory rule.
+REM Expected:
+REM RAGBackendHighMemory.
+findstr /n /i "RAGBackendHighMemory" prometheus-alert-rules.yml
+
+
+REM Description:
+REM Inspect error rule.
+REM Expected:
+REM RAGHighErrorRate.
+findstr /n /i "RAGHighErrorRate" prometheus-alert-rules.yml
+
+
+REM Description:
+REM Print exact rules inside Prometheus.
+REM Expected:
+REM Current mounted rule file.
+docker compose exec prometheus cat /etc/prometheus/alert_rules.yml
+
+
+REM Description:
+REM Reload Prometheus after rule change.
+REM Expected:
+REM Prometheus recreated and started.
+docker compose up -d --force-recreate prometheus
+
+
+REM Browser:
+REM http://localhost:9090/alerts
+
+
+REM =====================================================================
+REM 8. ALERTMANAGER
+REM Was the firing alert delivered?
+REM =====================================================================
+
+REM Description:
+REM Confirm Prometheus knows Alertmanager.
+REM Expected:
+REM activeAlertmanagers includes alertmanager:9093.
+curl http://localhost:9090/api/v1/alertmanagers
+
+
+REM Description:
+REM Test Prometheus -> Alertmanager connectivity.
+REM Expected:
+REM OK
+docker compose exec prometheus wget -qO- http://alertmanager:9093/-/ready
+
+
+REM Description:
+REM Retrieve Alertmanager active alerts.
+REM Expected:
+REM JSON array.
+REM [] means no active Alertmanager alerts.
+curl http://localhost:9093/api/v2/alerts
+
+
+REM Description:
+REM Check Alertmanager readiness.
+REM Expected:
+REM OK
+curl http://localhost:9093/-/ready
+
+
+REM Description:
+REM Check Alertmanager health.
+REM Expected:
+REM OK
+curl http://localhost:9093/-/healthy
+
+
+REM Description:
+REM Validate Alertmanager config.
+REM Expected:
+REM SUCCESS.
+docker compose exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+
+
+REM Description:
+REM Check Alertmanager logs.
+REM Expected:
+REM No webhook delivery errors.
+docker compose logs --tail=300 alertmanager
+
+
+REM Description:
+REM Follow Alertmanager logs.
+REM Expected:
+REM Live notification activity.
+docker compose logs -f alertmanager
+
+
+REM Description:
+REM Show repeat interval.
+REM Expected:
+REM repeat_interval: 30m or configured value.
+findstr /n /i "repeat_interval" alertmanager.yml
+
+
+REM Description:
+REM Print Alertmanager config inside container.
+REM Expected:
+REM route, receiver, webhook, repeat_interval.
+docker compose exec alertmanager cat /etc/alertmanager/alertmanager.yml
+
+
+REM Browser:
+REM http://localhost:9093
+
+
+REM =====================================================================
+REM 9. OBSERVABILITY AGENT
+REM Did it receive /alerts/prometheus?
+REM =====================================================================
+
+REM Description:
+REM Check agent health.
+REM Expected:
+REM healthy.
+curl http://localhost:8003/health
+
+
+REM Description:
+REM Find incoming Prometheus webhook calls.
+REM Expected:
+REM POST /alerts/prometheus HTTP/1.1 200 OK
+docker compose logs --tail=500 observability-agent | findstr /i "/alerts/prometheus"
+
+
+REM Description:
+REM Follow all agent logs live.
+REM Expected:
+REM New webhook/MCP/email activity.
+docker compose logs -f observability-agent
+
+
+REM Description:
+REM Show recent alert processing.
+REM Expected:
+REM Portkey + MCP calls following webhook.
+docker compose logs --tail=300 observability-agent
+
+
+REM Description:
+REM Search alert-processing errors.
+REM Expected:
+REM Ideally no failures.
+docker compose logs --tail=500 observability-agent | findstr /i "alert error failed exception"
+
+
+REM Description:
+REM Send manual webhook alert.
+REM Expected:
+REM HTTP 200 response.
+curl -X POST http://localhost:8003/alerts/prometheus -H "Content-Type: application/json" -d "{\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"TEST_RAG_HIGH_CPU\",\"severity\":\"warning\",\"service\":\"rag-backend\",\"category\":\"cpu\"},\"annotations\":{\"summary\":\"Test CPU warning\",\"description\":\"Manual alert pipeline test.\"}}]}"
+
+
+REM =====================================================================
+REM 10. MCP INVESTIGATION
+REM Did Prometheus/OpenSearch tools execute?
+REM =====================================================================
+
+REM Description:
+REM Verify Prometheus MCP is running.
+REM Expected:
+REM Up.
+docker compose ps prometheus-mcp
+
+
+REM Description:
+REM Verify OpenSearch MCP is running.
+REM Expected:
+REM Up.
+docker compose ps opensearch-mcp
+
+
+REM Description:
+REM Inspect Prometheus MCP logs.
+REM Expected:
+REM MCP request activity.
+docker compose logs --tail=300 prometheus-mcp
+
+
+REM Description:
+REM Inspect OpenSearch MCP logs.
+REM Expected:
+REM OpenSearch tool activity.
+docker compose logs --tail=300 opensearch-mcp
+
+
+REM Description:
+REM Confirm observability-agent loaded tool counts.
+REM Expected:
+REM Prometheus tools: 36
+REM OpenSearch tools: 15
+REM Total MCP tools: 51
+docker compose logs --tail=200 observability-agent
+
+
+REM Description:
+REM Confirm alert tools loaded.
+REM Expected:
+REM get_active_alerts
+REM get_alert_by_name
+REM get_alert_summary
+docker compose logs --tail=200 observability-agent | findstr /i "get_active_alerts get_alert_by_name get_alert_summary"
+
+
+REM Description:
+REM Verify alert functions exist inside prometheus-mcp.
+REM Expected:
+REM True
+REM True
+REM True
+docker compose exec prometheus-mcp python -c "import prometheus_mcp.server as s; print(hasattr(s,'get_active_alerts')); print(hasattr(s,'get_alert_by_name')); print(hasattr(s,'get_alert_summary'))"
+
+
+REM Description:
+REM Confirm server.py used by running container.
+REM Expected:
+REM /app/prometheus_mcp/server.py
+docker compose exec prometheus-mcp python -c "import prometheus_mcp.server as s; print(s.__file__)"
+
+
+REM Description:
+REM Check MCP registration ordering.
+REM Expected:
+REM get_active_alerts/get_alert_by_name/get_alert_summary
+REM before if __name__ / mcp.run.
+findstr /n /c:"get_active_alerts" /c:"get_alert_by_name" /c:"get_alert_summary" /c:"if __name__" /c:"mcp.run" prometheus_mcp\server.py
+
+
+REM Description:
+REM Ask observability agent about active alerts.
+REM Expected:
+REM Agent should use get_active_alerts.
+curl -X POST http://localhost:8003/observe -H "Content-Type: application/json" -d "{\"question\":\"Are there any active Prometheus alerts right now? Use the Prometheus alert tool.\"}"
+
+
+REM Description:
+REM Ask about specific CPU alert.
+REM Expected:
+REM Agent should use get_alert_by_name.
+curl -X POST http://localhost:8003/observe -H "Content-Type: application/json" -d "{\"question\":\"Has RAGBackendHighCPU fired? Show state, severity, value and start time.\"}"
+
+
+REM Description:
+REM Confirm MCP calls from observability-agent.
+REM Expected:
+REM POST http://prometheus-mcp:8001/mcp 200 OK
+REM POST http://opensearch-mcp:8002/mcp 200 OK
+docker compose logs --tail=300 observability-agent | findstr /i "prometheus-mcp opensearch-mcp"
+
+
+REM =====================================================================
+REM 11. NOTIFICATION
+REM Was the email actually sent?
+REM =====================================================================
+
+REM Description:
+REM Search for successful alert email.
+REM Expected:
+REM Alert email successfully sent for <alert-name>
+docker compose logs --tail=500 observability-agent | findstr /i "Alert email successfully sent"
+
+
+REM Description:
+REM Search specifically for CPU alert notification.
+REM Expected:
+REM Alert email successfully sent for RAGBackendHighCPU
+docker compose logs --tail=500 observability-agent | findstr /i "RAGBackendHighCPU"
+
+
+REM Description:
+REM Search SMTP/email failures.
+REM Expected:
+REM Ideally no authentication/errors.
+docker compose logs --tail=500 observability-agent | findstr /i "smtp email authentication failed error"
+
+
+REM Description:
+REM Verify SMTP configuration without displaying secret.
+REM Expected:
+REM SMTP configured
+docker compose exec observability-agent python -c "import os; print('SMTP configured' if os.getenv('SMTP_PASSWORD') and os.getenv('ALERT_EMAIL_TO') else 'SMTP missing')"
+
+
+REM Description:
+REM Check whether SMTP password exists.
+REM Expected:
+REM True
+docker compose exec observability-agent python -c "import os; print(bool(os.getenv('SMTP_PASSWORD')))"
+
+
+REM Description:
+REM Direct Gmail SMTP test.
+REM Expected:
+REM EMAIL SENT
+docker compose exec observability-agent python -c "import os,smtplib; from email.message import EmailMessage; m=EmailMessage(); m['From']=os.environ['ALERT_EMAIL_FROM']; m['To']=os.environ['ALERT_EMAIL_TO']; m['Subject']='RAG Observability Email Test'; m.set_content('Gmail SMTP is working correctly for the RAG observability system.'); s=smtplib.SMTP(os.environ.get('SMTP_HOST','smtp.gmail.com'),int(os.environ.get('SMTP_PORT','587')),timeout=20); s.starttls(); s.login(os.environ['SMTP_USERNAME'],os.environ['SMTP_PASSWORD']); s.send_message(m); s.quit(); print('EMAIL SENT')"
+
+
+REM =====================================================================
+REM COMPLETE END-TO-END INCIDENT CHECK
+REM Run these in this exact order.
+REM =====================================================================
+
+REM 1. Containers
+docker compose ps
+
+REM 2. Health
+curl http://localhost:8000/health
+curl http://localhost:8003/health
+curl http://localhost:9090/-/healthy
+curl http://localhost:9093/-/ready
+
+REM 3. Network
+docker compose exec prometheus wget -qO- http://alertmanager:9093/-/ready
+docker compose exec observability-agent python -c "import socket; print(socket.gethostbyname('prometheus-mcp')); print(socket.gethostbyname('opensearch-mcp'))"
+
+REM 4. Application logs
+docker compose logs --tail=300 rag-backend | findstr /i "error exception traceback failed"
+
+REM 5. Metrics
+docker stats --no-stream
+curl http://localhost:9464/metrics
+
+REM 6. Prometheus targets
+curl http://localhost:9090/api/v1/targets
+
+REM 7. Prometheus rules / alerts
+docker compose exec prometheus promtool check rules /etc/prometheus/alert_rules.yml
+curl http://localhost:9090/api/v1/alerts
+
+REM 8. Alertmanager
+curl http://localhost:9090/api/v1/alertmanagers
+curl http://localhost:9093/api/v2/alerts
+
+REM 9. Observability agent webhook
+docker compose logs --tail=300 observability-agent | findstr /i "/alerts/prometheus"
+
+REM 10. MCP investigation
+docker compose logs --tail=300 observability-agent | findstr /i "prometheus-mcp opensearch-mcp"
+
+REM 11. Notification
+docker compose logs --tail=300 observability-agent | findstr /i "Alert email successfully sent"
+
+
+REM =====================================================================
+REM QUICK INCIDENT DECISION TREE
+REM =====================================================================
+
+REM If docker compose ps shows container missing/exited:
+REM -> Fix container/startup first.
+
+REM If container is Up but /health fails:
+REM -> Investigate process/application startup.
+
+REM If health works but service-to-service call fails:
+REM -> Investigate Docker network/DNS.
+
+REM If network works but request fails:
+REM -> Read application logs.
+
+REM If application works but monitoring is wrong:
+REM -> Check metrics and Prometheus targets.
+
+REM If targets are UP but no alert:
+REM -> Check Prometheus rules and thresholds.
+
+REM If Prometheus says firing but Alertmanager returns []:
+REM -> Fix Prometheus -> Alertmanager delivery.
+
+REM If Alertmanager has alert but agent has no /alerts/prometheus POST:
+REM -> Fix Alertmanager webhook -> agent.
+
+REM If agent receives webhook but no MCP traffic:
+REM -> Fix MCP tool registration/connectivity.
+
+REM If MCP investigation succeeds but no email:
+REM -> Fix SMTP/email notification.
+
+
+                TROUBLESHOOTING STEPS 
+1. Container
+      ↓
+   Is it running?
+
+2. Health
+      ↓
+   Is the process healthy?
+
+3. Network
+      ↓
+   Can services resolve/reach each other?
+
+4. Application logs
+      ↓
+   Any Python/FastAPI/retrieval/LLM errors?
+
+5. Metrics
+      ↓
+   CPU, memory, request rate, latency, errors?
+
+6. Prometheus targets
+      ↓
+   Is telemetry being scraped?
+
+7. Prometheus rules
+      ↓
+   Is a threshold violated?
+
+8. Alertmanager
+      ↓
+   Was the firing alert delivered?
+
+9. Observability agent
+      ↓
+   Did it receive /alerts/prometheus?
+
+10. MCP investigation
+       ↓
+    Did Prometheus/OpenSearch tools execute?
+
+11. Notification
+      ↓
+    Was the email actually sent?
+    
+    Descripion of project
+    """I built an end-to-end production-oriented RAG platform using FastAPI and Streamlit,
+     containerized as microservices with Docker Compose. 
+     I instrumented the system with OpenTelemetry and Prometheus, 
+     implemented infrastructure and application metrics, alert rules 
+     and Alertmanager-based alert routing, and built MCP servers that 
+     expose controlled Prometheus and OpenSearch observability tools to 
+     a LangChain agent. When a production threshold is breached, 
+     Alertmanager sends the event to the observability agent, 
+     which investigates the incident using metrics and traces and 
+     automatically sends an email notification with the findings."""

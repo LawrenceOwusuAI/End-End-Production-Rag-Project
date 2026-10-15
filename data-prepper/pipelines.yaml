@@ -1,0 +1,15 @@
+otel-trace-pipeline:
+
+  source:
+    otlp_traces:
+      ssl: false
+
+  sink:
+    - opensearch:
+        hosts:
+          - "https://search-rag-observability-sbu7ojlusgvz74or7samkhvtme.us-east-1.es.amazonaws.com"
+
+        aws:
+          region: "us-east-1"
+
+        index_type: trace-analytics-raw

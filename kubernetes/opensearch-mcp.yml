@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: opensearch-mcp
+  namespace: rag
+
+spec:
+
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: opensearch-mcp
+
+  template:
+
+    metadata:
+      labels:
+        app: opensearch-mcp
+
+    spec:
+
+      containers:
+
+        - name: opensearch-mcp
+
+          image: lawrenceowusuml/opensearch-mcp:1.0
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+
+            - name: http
+              containerPort: 8002
+
+          envFrom:
+
+            - configMapRef:
+                name: rag-config
+
+            - secretRef:
+                name: rag-secrets
+
+          resources:
+
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+
+          readinessProbe:
+
+            tcpSocket:
+              port: 8002
+
+            periodSeconds: 10
+
+
+---
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: opensearch-mcp
+  namespace: rag
+
+spec:
+
+  type: ClusterIP
+
+  selector:
+    app: opensearch-mcp
+
+  ports:
+
+    - name: http
+
+      port: 8002
+
+      targetPort: 8002

@@ -1,0 +1,75 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rag-alert-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # RAG APPLICATION AVAILABILITY
+    - name: rag-application
+      rules:
+        - alert: RAGBackendUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{
+              namespace="rag",
+              deployment="rag-backend"
+            } < 1
+          for: 2m
+          labels:
+            severity: critical
+            service: rag-backend
+          annotations:
+            summary: "RAG backend is unavailable"
+            description: >
+              The rag-backend deployment has no available replicas
+              for more than two minutes.
+        - alert: RAGFrontendUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{
+              namespace="rag",
+              deployment="rag-frontend"
+            } < 1
+          for: 2m
+          labels:
+            severity: critical
+            service: rag-frontend
+          annotations:
+            summary: "RAG frontend is unavailable"
+            description: >
+              The rag-frontend deployment has no available replicas.
+        - alert: RAGTelemetryMissing
+          expr: |
+            absent(
+              up{job="rag-otel"} == 1
+            )
+          for: 2m
+          labels:
+            severity: critical
+            service: rag-backend
+          annotations:
+            summary: "RAG telemetry is missing"
+            description: >
+              Prometheus cannot find a healthy RAG OpenTelemetry
+              metrics target.
+
+        # Repeated container restarts
+        - alert: RAGPodRestartingFrequently
+          expr: |
+            sum by (pod, container) (
+              increase(
+                kube_pod_container_status_restarts_total{
+                  namespace="rag"
+                }[10m]
+              )
+            ) > 3
+          for: 5m
+          labels:
+            severity: warning
+            service: rag-platform
+          annotations:
+            summary: "RAG pod restarting frequently"
+            description: >
+              A container in the rag namespace has restarted
+              more than three times in ten minutes.

@@ -1,0 +1,63 @@
+# GRAFANA
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true
+  service:
+    type: ClusterIP
+
+# PROMETHEUS
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    replicas: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+
+# ALERTMANAGER
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    alertmanagerConfigSelector:
+      matchLabels:
+        alertconfig: rag
+    alertmanagerConfigMatcherStrategy:
+      type: None
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+# NODE EXPORTER
+nodeExporter:
+  enabled: true
+
+# KUBE STATE METRICS
+kubeStateMetrics:
+  enabled: true
+
+# KUBELET + CADVISOR
+kubelet:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    kubelet: true
+    cAdvisor: true
+    cAdvisorInterval: 15s
+
+# KUBERNETES DEFAULT MONITORING RULES
+defaultRules:
+  create: true
+
+# CORE KUBERNETES SERVICE MONITORS
+kubernetesServiceMonitors:
+  enabled: true

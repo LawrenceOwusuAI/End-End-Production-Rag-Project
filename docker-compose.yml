@@ -1,0 +1,397 @@
+services:
+
+  # ==========================================================
+  # STREAMLIT FRONTEND
+  # ==========================================================
+
+  rag-frontend:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+
+    container_name: rag-frontend
+
+    environment:
+
+      # Inside Docker, use the service name rather than 127.0.0.1
+      BASE_API_URL: ${BASE_API_URL}
+
+      # Streamlit will use this to call the observability agent
+      OBSERVABILITY_BASE_URL: http://observability-agent:8003
+
+    ports:
+      - "8501:8501"
+
+    depends_on:
+
+      rag-backend:
+        condition: service_healthy
+
+      observability-agent:
+        condition: service_started
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+#Alert Manager Service
+  alertmanager:
+
+    image: prom/alertmanager:latest
+
+    container_name: alertmanager
+
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+    ports:
+      - "9093:9093"
+    networks:
+    - rag-network
+
+    restart: unless-stopped
+
+
+  # FASTAPI RAG BACKEND
+ 
+  rag-backend:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+
+    container_name: rag-backend
+    mem_limit: 2g
+    env_file:
+      - .env
+
+    environment:
+
+      QUALITY_EVAL_SAMPLE_RATE: ${QUALITY_EVAL_SAMPLE_RATE}
+
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
+
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+
+      OTEL_SERVICE_NAME: rag-api
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+
+      - rag_input:/app/input
+
+      - rag_output:/app/output
+
+      - rag_logs:/app/logs
+
+    depends_on:
+
+      otel-collector:
+        condition: service_started
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+  # ==========================================================
+  # LANGCHAIN OBSERVABILITY AGENT
+  #
+  # User asks natural-language questions here.
+  # ==========================================================
+
+  observability-agent:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.observability-agent
+
+    container_name: observability-agent
+
+    env_file:
+      - .env
+
+    environment:
+
+      PROMETHEUS_MCP_URL: http://prometheus-mcp:8001/mcp
+      OPENSEARCH_MCP_URL: http://opensearch-mcp:8002/mcp
+      OBSERVABILITY_MODEL: gpt-4.1-mini
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: observability-agent
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+
+      
+
+      
+
+    ports:
+      - "8003:8003"
+
+    depends_on:
+
+      prometheus-mcp:
+        condition: service_started
+
+      opensearch-mcp:
+        condition: service_started
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+  # ==========================================================
+  # PROMETHEUS MCP
+  # ==========================================================
+
+  prometheus-mcp:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.prometheus-mcp
+
+    container_name: prometheus-mcp
+
+    environment:
+
+      PROMETHEUS_URL: http://prometheus:9090
+
+    ports:
+      - "8001:8001"
+
+    depends_on:
+
+      prometheus:
+        condition: service_started
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+  # ==========================================================
+  # OPENSEARCH MCP
+  #
+  # Talks to AWS-managed OpenSearch.
+  # ==========================================================
+
+  opensearch-mcp:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.opensearch-mcp
+
+    container_name: opensearch-mcp
+
+    env_file:
+      - .env
+
+    environment:
+
+      AWS_REGION: ${AWS_REGION}
+
+      OPENSEARCH_HOST: ${OPENSEARCH_HOST}
+
+      OPENSEARCH_LOG_INDEX: ${OPENSEARCH_LOG_INDEX:-logs-otel-v1-*}
+
+      OPENSEARCH_TRACE_INDEX: ${OPENSEARCH_TRACE_INDEX:-otel-v1-apm-span-*}
+
+    ports:
+      - "8002:8002"
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+  # ==========================================================
+  # OPENTELEMETRY COLLECTOR
+  # ==========================================================
+
+  otel-collector:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.otel
+
+    container_name: otel-collector
+
+    ports:
+
+      - "4317:4317"
+
+      - "4318:4318"
+
+      - "9464:9464"
+
+    depends_on:
+
+      data-prepper:
+        condition: service_started
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+  # ==========================================================
+  # DATA PREPPER
+  #
+  # Logs/traces:
+  #
+  # OTel Collector
+  #       ↓
+  # Data Prepper
+  #       ↓
+  # AWS OpenSearch
+  # ==========================================================
+
+  data-prepper:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.data-prepper
+
+    container_name: data-prepper
+
+    env_file:
+      - .env
+
+    environment:
+
+      OPENSEARCH_HOST: ${OPENSEARCH_HOST}
+
+      AWS_REGION: ${AWS_REGION}
+
+    ports:
+
+      - "21893:21893"
+
+      - "4900:4900"
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+  # ==========================================================
+  # PROMETHEUS
+  # ==========================================================
+
+  prometheus:
+
+    build:
+      context: .
+      dockerfile: Dockerfile.prometheus
+
+    container_name: prometheus
+
+    ports:
+      - "9090:9090"
+
+    depends_on:
+    - alertmanager
+    - otel-collector
+    - cadvisor
+
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-alert-rules.yml:/etc/prometheus/alert_rules.yml:ro
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+    
+
+
+
+  # ==========================================================
+  # CADVISOR
+  #
+  # LOCAL DOCKER CPU/MEMORY METRICS.
+  #
+  # For ECS production, replace this with ECS/CloudWatch/ADOT
+  # container metrics rather than depending on cAdvisor.
+  # ==========================================================
+
+  cadvisor:
+
+    image: gcr.io/cadvisor/cadvisor:latest
+
+    container_name: cadvisor
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+
+      - /:/rootfs:ro
+
+      - /var/run:/var/run:ro
+
+      - /sys:/sys:ro
+
+      - /var/lib/docker/:/var/lib/docker:ro
+
+    privileged: true
+
+    networks:
+      - rag-network
+
+    restart: unless-stopped
+
+
+
+
+# NETWORK
+
+networks:
+
+  rag-network:
+
+    driver: bridge
+
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
+
+volumes:
+
+  prometheus_data:
+
+  rag_input:
+
+  rag_output:
+
+  rag_logs:

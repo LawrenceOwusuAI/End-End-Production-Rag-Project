@@ -1,0 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+kubernetes/secrets.yml
+*.pem
+*.key
+terraform.* 
+configmap.yml 
+terraform\.terraform* 
+terraform/.terraform/
+.env
+.env.*
+!.env.example
+logs/
+*.log
+*.db
+output/
+processed_output/
+kubernetes/secrets.yml
+*.pem

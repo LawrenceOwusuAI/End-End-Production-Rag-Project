@@ -1,0 +1,52 @@
+# NVIDIA NEMO GUARDRAILS CONFIGURATION
+models:
+  - type: main
+    engine: openai
+    model: gpt-4.1-mini
+    api_key_env_var: OPENAI_API_KEY
+    parameters:
+      temperature: 0
+      
+# RAILS
+rails:
+  # CONFIGURATION
+  config:
+    # PII DETECTION
+    sensitive_data_detection:
+      input:
+        entities:
+          - EMAIL_ADDRESS
+          - PHONE_NUMBER
+          - CREDIT_CARD
+          - US_SSN
+          - IP_ADDRESS
+          
+      output:
+        entities:
+          - EMAIL_ADDRESS
+          - PHONE_NUMBER
+          - CREDIT_CARD
+          - US_SSN
+          - IP_ADDRESS
+          
+  # INPUT GUARDRAILS
+  input:
+    parallel: false
+    flows:
+      # Semantic off-topic + safety classification
+      - self check input
+      # Deterministic prompt-injection protection
+      - custom block input
+      # PII sanitization
+      - mask sensitive data on input
+
+  # OUTPUT GUARDRAILS
+  output:
+    parallel: false
+    flows:
+      # Prevent credentials and secrets from leaking
+      - custom block output secrets
+      # Mask PII in generated response
+      - mask sensitive data on output
+      # Semantic safety check
+      - self check output

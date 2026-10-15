@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: observability-agent
+  namespace: rag
+
+spec:
+
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: observability-agent
+
+  template:
+
+    metadata:
+      labels:
+        app: observability-agent
+
+    spec:
+
+      containers:
+
+        - name: observability-agent
+
+          image: lawrenceowusuml/observability-agent:1.0
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+
+            - name: http
+              containerPort: 8003
+
+          envFrom:
+
+            - configMapRef:
+                name: rag-config
+
+            - secretRef:
+                name: rag-secrets
+
+          resources:
+
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+
+          startupProbe:
+
+            httpGet:
+              path: /health
+              port: 8003
+
+            periodSeconds: 10
+            failureThreshold: 30
+
+          readinessProbe:
+
+            httpGet:
+              path: /health
+              port: 8003
+
+            periodSeconds: 15
+
+          livenessProbe:
+
+            httpGet:
+              path: /health
+              port: 8003
+
+            periodSeconds: 30
+
+
+---
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: observability-agent
+  namespace: rag
+
+spec:
+
+  type: ClusterIP
+
+  selector:
+    app: observability-agent
+
+  ports:
+
+    - name: http
+
+      port: 8003
+
+      targetPort: 8003
+
+ 

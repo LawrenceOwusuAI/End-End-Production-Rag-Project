@@ -1,0 +1,29 @@
+# CUSTOM REFUSAL RESPONSE
+
+define bot refuse custom security request
+
+  "I can't process that request because it violates the application's security policy."
+
+# CUSTOM INPUT BLOCKING FLOW
+
+define subflow custom block input
+
+  $result = execute custom_block_input
+
+  if $result.is_blocked
+
+    bot refuse custom security request
+
+    stop
+
+# CUSTOM OUTPUT SECRET BLOCKING FLOW
+
+define subflow custom block output secrets
+
+  $result = execute custom_block_output_secrets
+
+  if $result.is_blocked
+
+    bot refuse custom security request
+
+    stop

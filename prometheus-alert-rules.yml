@@ -1,0 +1,335 @@
+groups:
+
+  - name: rag-early-warning-alerts
+
+    rules:
+
+      # =====================================================
+      # CPU WARNING
+      # =====================================================
+
+      - alert: RAGBackendHighCPU
+        expr: |
+          100 *
+          sum(
+            rate(
+              container_cpu_usage_seconds_total{
+                container_label_com_docker_compose_service="rag-backend"
+              }[2m]
+            )
+          ) >= 0.75
+
+        for: 10m
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: cpu
+
+        annotations:
+          summary: "RAG backend CPU utilization is elevated"
+          description: "CPU utilization has remained at or above 75% for 10 minutes."
+
+
+      # =====================================================
+      # CPU HIGH WARNING
+      # =====================================================
+
+      - alert: RAGBackendVeryHighCPU
+        expr: |
+          100 *
+          sum(
+            rate(
+              container_cpu_usage_seconds_total{
+                container_label_com_docker_compose_service="rag-backend"
+              }[2m]
+            )
+          ) >= 85
+
+        for: 5m
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: cpu
+
+        annotations:
+          summary: "RAG backend CPU utilization is very high"
+          description: "CPU utilization has remained at or above 85% for 5 minutes."
+
+
+      # =====================================================
+      # CPU CRITICAL
+      # =====================================================
+
+      - alert: RAGBackendCriticalCPU
+        expr: |
+          100 *
+          sum(
+            rate(
+              container_cpu_usage_seconds_total{
+                container_label_com_docker_compose_service="rag-backend"
+              }[2m]
+            )
+          ) >= 95
+
+        for: 2m
+
+        labels:
+          severity: critical
+          service: rag-backend
+          category: cpu
+
+        annotations:
+          summary: "RAG backend CPU is critically high"
+          description: "CPU utilization has remained at or above 95% for 2 minutes."
+
+
+      # =====================================================
+      # MEMORY WARNING
+      # =====================================================
+
+      - alert: RAGBackendHighMemory
+        expr: |
+          100 *
+          (
+            max(
+              container_memory_working_set_bytes{
+                container_label_com_docker_compose_service="rag-backend",
+                container!=""
+              }
+            )
+            /
+            clamp_min(
+              max(
+                container_spec_memory_limit_bytes{
+                  container_label_com_docker_compose_service="rag-backend",
+                  container!=""
+                }
+              ),
+              1
+            )
+          ) >= 75
+
+        for: 10m
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: memory
+
+        annotations:
+          summary: "RAG backend memory utilization is elevated"
+          description: "Memory utilization has remained at or above 75% for 10 minutes."
+
+
+      # =====================================================
+      # MEMORY HIGH WARNING
+      # =====================================================
+
+      - alert: RAGBackendVeryHighMemory
+        expr: |
+          100 *
+          (
+            max(
+              container_memory_working_set_bytes{
+                container_label_com_docker_compose_service="rag-backend",
+                container!=""
+              }
+            )
+            /
+            clamp_min(
+              max(
+                container_spec_memory_limit_bytes{
+                  container_label_com_docker_compose_service="rag-backend",
+                  container!=""
+                }
+              ),
+              1
+            )
+          ) >= 85
+
+        for: 5m
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: memory
+
+        annotations:
+          summary: "RAG backend memory utilization is very high"
+          description: "Memory utilization has remained at or above 85% for 5 minutes."
+
+
+      # =====================================================
+      # MEMORY CRITICAL
+      # =====================================================
+
+      - alert: RAGBackendCriticalMemory
+        expr: |
+          100 *
+          (
+            max(
+              container_memory_working_set_bytes{
+                container_label_com_docker_compose_service="rag-backend",
+                container!=""
+              }
+            )
+            /
+            clamp_min(
+              max(
+                container_spec_memory_limit_bytes{
+                  container_label_com_docker_compose_service="rag-backend",
+                  container!=""
+                }
+              ),
+              1
+            )
+          ) >= 95
+
+        for: 2m
+
+        labels:
+          severity: critical
+          service: rag-backend
+          category: memory
+
+        annotations:
+          summary: "RAG backend memory is critically high"
+          description: "Memory utilization has remained at or above 95% for 2 minutes."
+
+
+      # =====================================================
+      # ERROR RATE WARNING
+      # =====================================================
+
+      - alert: RAGHighErrorRate
+        expr: |
+          100 *
+          (
+            sum(rate(rag_errors_total[5m]))
+            /
+            clamp_min(
+              sum(rate(rag_requests_total[5m])),
+              0.000001
+            )
+          ) >= 2
+
+        for: 5m
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: errors
+
+        annotations:
+          summary: "RAG error rate is elevated"
+          description: "RAG request error rate has remained at or above 2% for 5 minutes."
+
+
+      # =====================================================
+      # ERROR RATE CRITICAL
+      # =====================================================
+
+      - alert: RAGCriticalErrorRate
+        expr: |
+          100 *
+          (
+            sum(rate(rag_errors_total[5m]))
+            /
+            clamp_min(
+              sum(rate(rag_requests_total[5m])),
+              0.000001
+            )
+          ) >= 5
+
+        for: 2m
+
+        labels:
+          severity: critical
+          service: rag-backend
+          category: errors
+
+        annotations:
+          summary: "RAG error rate is critically high"
+          description: "RAG request error rate has remained at or above 5% for 2 minutes."
+
+
+      # =====================================================
+      # REQUEST SUCCESS SLO
+      # =====================================================
+
+      - alert: RAGRequestSuccessSLOBreach
+        expr: |
+          100 *
+          (
+            1 -
+            (
+              sum(rate(rag_errors_total[5m]))
+              /
+              clamp_min(
+                sum(rate(rag_requests_total[5m])),
+                0.000001
+              )
+            )
+          ) < 99
+
+        for: 5m
+
+        labels:
+          severity: critical
+          service: rag-backend
+          category: slo
+
+        annotations:
+          summary: "RAG request-success SLO violated"
+          description: "Request success rate has remained below 99% for 5 minutes."
+
+
+      # =====================================================
+      # TIMEOUTS
+      # =====================================================
+
+      - alert: RAGRequestTimeouts
+        expr: |
+          sum(
+            increase(
+              http_server_duration_milliseconds_count{
+                job="rag-api",
+                http_status_code="504"
+              }[5m]
+            )
+          ) >= 1
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: timeout
+
+        annotations:
+          summary: "RAG request timeout detected"
+          description: "One or more HTTP 504 timeouts occurred during the last 5 minutes."
+
+
+      # =====================================================
+      # CONTAINER RESTART
+      # =====================================================
+
+      - alert: RAGBackendRestarted
+        expr: |
+          sum(
+            changes(
+              container_start_time_seconds{
+                container_label_com_docker_compose_service="rag-backend"
+              }[10m]
+            )
+          ) >= 1
+
+        labels:
+          severity: warning
+          service: rag-backend
+          category: restart
+
+        annotations:
+          summary: "RAG backend container restarted"
+          description: "The RAG backend container restarted during the last 10 minutes."

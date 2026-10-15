@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: rag-alert-routing
+  namespace: monitoring
+  labels:
+    alertconfig: rag
+spec:
+  route:
+    receiver: rag-observability-agent
+    groupBy:
+      - alertname
+      - service
+    groupWait: 10s
+    groupInterval: 30s
+    repeatInterval: 4h
+  receivers:
+    - name: rag-observability-agent
+      webhookConfigs:
+        - url: >-
+            http://observability-agent.rag.svc.cluster.local:8003/alerts/prometheus
+          sendResolved: true

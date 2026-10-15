@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: data-prepper
+  namespace: rag
+
+spec:
+
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: data-prepper
+
+  template:
+
+    metadata:
+      labels:
+        app: data-prepper
+
+    spec:
+
+      containers:
+
+        - name: data-prepper
+
+          image: lawrenceowusuml/data-prepper:1.0
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+
+            - name: api
+              containerPort: 4900
+
+            - name: ingest
+              containerPort: 21893
+
+          envFrom:
+
+            - configMapRef:
+                name: rag-config
+
+            - secretRef:
+                name: rag-secrets
+
+          resources:
+
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+
+          readinessProbe:
+
+            tcpSocket:
+              port: 4900
+
+            periodSeconds: 15
+
+            failureThreshold: 10
+
+
+---
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: data-prepper
+  namespace: rag
+
+spec:
+
+  type: ClusterIP
+
+  selector:
+    app: data-prepper
+
+  ports:
+
+    - name: api
+
+      port: 4900
+
+      targetPort: 4900
+
+
+    - name: ingest
+
+      port: 21893
+
+      targetPort: 21893

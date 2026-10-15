@@ -1,0 +1,15 @@
+# Dockerfile.data-prepper
+
+FROM opensearchproject/data-prepper:latest
+
+
+COPY data-prepper/pipelines.yaml \
+    /usr/share/data-prepper/pipelines/pipelines.yaml
+
+
+COPY data-prepper/data-prepper-config.yaml \
+    /usr/share/data-prepper/config/data-prepper-config.yaml
+
+
+EXPOSE 21893
+EXPOSE 4900

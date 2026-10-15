@@ -1,0 +1,81 @@
+
+# GLOBAL SETTINGS
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "alertmanager:9093"
+
+
+scrape_configs:
+
+  - job_name: "rag-api"
+    static_configs:
+      - targets:
+          - "otel-collector:9464"
+
+
+  - job_name: "cadvisor"
+    static_configs:
+      - targets:
+          - "cadvisor:8080"
+
+# # SCRAPE CONFIGURATIONS
+# scrape_configs:
+
+
+#   # ==========================================================
+#   # RAG APPLICATION METRICS
+#   #
+#   # Your FastAPI application sends OpenTelemetry metrics to:
+#   #
+#   #     otel-collector:4318
+#   #
+#   # The Collector converts those metrics into Prometheus
+#   # format and exposes them on:
+#   #
+#   #     otel-collector:9464
+#   #
+#   # Prometheus scrapes that endpoint here.
+  
+
+#   - job_name:
+#       "rag-api"
+
+#     static_configs:
+
+#       - targets:
+
+#           - "otel-collector:9464"
+
+
+#   # DOCKER CONTAINER METRICS
+#   #
+#   # cAdvisor exposes container-level metrics including:
+#   #
+#   # - CPU
+#   # - memory
+#   # - network
+#   # - filesystem
+#   #
+#   # These metrics are useful for the Prometheus MCP tools.
+#   # ==========================================================
+
+#   - job_name:
+#       "cadvisor"
+
+#     static_configs:
+
+#       - targets:
+
+#           - "cadvisor:8080"

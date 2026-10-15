@@ -1,0 +1,25 @@
+{
+  "hit_at_4": 0.8823529411764706,
+  "recall_at_4": 0.8823529411764706,
+  "mrr": 0.8431372549019608,
+  "ndcg_at_4": 0.8529411764705882,
+  "context_precision": 0.7941176470028595,
+  "context_recall": 0.8823529411764706,
+  "faithfulness": 0.9869281045751634,
+  "answer_relevancy": 0.8311916249584875,
+  "factual_correctness": 0.7411764705882353,
+  "average_rag_latency_seconds": 5.605752941176471,
+  "evaluated_samples": 17,
+  "thresholds": {
+    "hit_at_4": 0.7,
+    "recall_at_4": 0.7,
+    "mrr": 0.7,
+    "ndcg_at_4": 0.7,
+    "context_precision": 0.7,
+    "context_recall": 0.7,
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7,
+    "factual_correctness": 0.7
+  },
+  "overall_pass": true
+}

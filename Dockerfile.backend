@@ -1,0 +1,76 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/app/.cache/huggingface
+
+# System dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        git \
+        libgl1 \
+        libglib2.0-0 \
+        tesseract-ocr && \
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Copy requirements
+COPY requirements-ragas.txt .
+
+# Install project dependencies
+RUN pip install --no-cache-dir -r requirements-ragas.txt
+
+# Replace any incompatible torch packages with CPU-compatible versions
+RUN pip uninstall -y torch torchvision torchaudio || true
+
+RUN pip install --no-cache-dir \
+    torch \
+    torchvision \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# Install spaCy model required by NeMo PII masking
+RUN python -m spacy download en_core_web_lg
+
+# Copy application files
+COPY app.py .
+COPY chunking.py .
+COPY vectorstore.py .
+COPY reranker.py .
+COPY llm_gateway.py .
+COPY logger.py .
+COPY exception.py .
+COPY observability.py .
+COPY quality_monitoring.py .
+
+# Guardrails
+COPY guardrails_runtime.py .
+COPY guardrails_config ./guardrails_config
+
+# Authentication
+COPY auth ./auth
+
+# Create directories
+RUN mkdir -p /app/input /app/output /app/logs
+
+# Preload embedding model
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
+# Preload reranker model
+RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAAI/bge-reranker-base')"
+
+EXPOSE 8000
+
+HEALTHCHECK \
+    --interval=30s \
+    --timeout=10s \
+    --start-period=120s \
+    --retries=5 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

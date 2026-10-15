@@ -1,0 +1,302 @@
+# otel-collector-config.yml
+
+
+# ============================================================
+# RECEIVERS
+#
+# The RAG application sends OpenTelemetry data here.
+#
+# We support both:
+#
+#   OTLP/gRPC  -> port 4317
+#   OTLP/HTTP  -> port 4318
+#
+# Your FastAPI/Logfire configuration will primarily use
+# OTLP/HTTP.
+# ============================================================
+
+receivers:
+
+  otlp:
+
+    protocols:
+
+      grpc:
+
+        endpoint:
+          0.0.0.0:4317
+
+
+      http:
+
+        endpoint:
+          0.0.0.0:4318
+
+
+
+# ============================================================
+# PROCESSORS
+#
+# Processors sit between receivers and exporters.
+#
+# memory_limiter:
+#   prevents the Collector from consuming unlimited memory.
+#
+# batch:
+#   groups telemetry before forwarding it.
+# ============================================================
+
+processors:
+
+
+  memory_limiter:
+
+    check_interval:
+      5s
+
+    limit_mib:
+      512
+
+    spike_limit_mib:
+      128
+
+
+
+  batch:
+
+    timeout:
+      5s
+
+    send_batch_size:
+      1024
+
+
+
+# ============================================================
+# EXPORTERS
+# ============================================================
+
+exporters:
+
+
+  # ==========================================================
+  # PROMETHEUS EXPORTER
+  #
+  # Metrics received through OTLP are exposed on:
+  #
+  # http://otel-collector:9464/metrics
+  #
+  # Prometheus will scrape this endpoint.
+  # ==========================================================
+
+  prometheus:
+
+    endpoint:
+      0.0.0.0:9464
+
+    enable_open_metrics:
+      true
+
+
+
+  # ==========================================================
+  # DATA PREPPER OTLP EXPORTER
+  #
+  # Logs and traces are forwarded from the Collector
+  # to Data Prepper.
+  #
+  # Docker service:
+  #
+  # data-prepper
+  #
+  # Unified OTLP port:
+  #
+  # 21893
+  # ==========================================================
+
+  otlp/data-prepper:
+
+    endpoint:
+      data-prepper:21890
+
+
+    tls:
+
+      insecure:
+        true
+
+
+
+  # ==========================================================
+  # DEBUG EXPORTER
+  #
+  # Useful during setup.
+  #
+  # Run:
+  #
+  # docker compose logs -f otel-collector
+  #
+  # and you will be able to confirm telemetry is arriving.
+  # ==========================================================
+
+  debug:
+
+    verbosity:
+      basic
+
+
+
+# ============================================================
+# SERVICE
+# ============================================================
+
+service:
+
+
+  # ==========================================================
+  # TELEMETRY ABOUT THE COLLECTOR ITSELF
+  # ==========================================================
+
+  telemetry:
+
+    logs:
+
+      level:
+        info
+
+
+
+  # ==========================================================
+  # PIPELINES
+  #
+  # We now have THREE independent pipelines:
+  #
+  #   1. metrics
+  #   2. logs
+  #   3. traces
+  # ==========================================================
+
+  pipelines:
+
+
+    # ========================================================
+    # METRICS PIPELINE
+    #
+    # FastAPI / Logfire / OTel
+    #        |
+    #        v
+    # OTLP receiver
+    #        |
+    #        v
+    # memory limiter
+    #        |
+    #        v
+    # batch
+    #        |
+    #        v
+    # Prometheus exporter
+    # ========================================================
+
+    metrics:
+
+      receivers:
+
+        - otlp
+
+
+      processors:
+
+        - memory_limiter
+
+        - batch
+
+
+      exporters:
+
+        - prometheus
+
+        - debug
+
+
+
+    # ========================================================
+    # LOG PIPELINE
+    #
+    # Structured events such as:
+    #
+    # rag.query
+    #
+    # rag.retrieved_document
+    #
+    # rag.generated_answer
+    #
+    # rag.request_error
+    #
+    # rag.vector_db_error
+    #
+    # are forwarded to Data Prepper.
+    # ========================================================
+
+    logs:
+
+      receivers:
+
+        - otlp
+
+
+      processors:
+
+        - memory_limiter
+
+        - batch
+
+
+      exporters:
+
+        - otlp/data-prepper
+
+        - debug
+
+
+
+    # ========================================================
+    # TRACE PIPELINE
+    #
+    # Spans such as:
+    #
+    # rag.retrieve_and_rerank
+    #
+    # rag.query_router
+    #
+    # rag.query_transformation
+    #
+    # rag.pinecone_retrieval
+    #
+    # rag.reciprocal_rank_fusion
+    #
+    # rag.cross_encoder_rerank
+    #
+    # rag.generate_answer
+    #
+    # are forwarded to Data Prepper.
+    # ========================================================
+
+    traces:
+
+      receivers:
+
+        - otlp
+
+
+      processors:
+
+        - memory_limiter
+
+        - batch
+
+
+      exporters:
+
+        - otlp/data-prepper
+
+        - debug
