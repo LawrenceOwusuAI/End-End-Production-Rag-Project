@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: "https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git"
     targetRevision: main
-    path: kubernetes
+    path: kubernetes/rag
 
     directory:
       recurse: true
