@@ -1,0 +1,55 @@
+# ============================================================
+# Traefik Ingress Controller
+#
+# Public entry point:
+# Internet -> AWS NLB -> Traefik -> Kubernetes services
+# ============================================================
+
+deployment:
+  replicas: 2
+
+service:
+  enabled: true
+  type: LoadBalancer
+
+  # Tell AWS Load Balancer Controller to manage this Service.
+  spec:
+    loadBalancerClass: service.k8s.aws/nlb
+
+  annotations:
+    # Create a public/internet-facing NLB.
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+
+    # Use EC2 instances / NodePorts as NLB targets.
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: instance
+
+    # Give the AWS load balancer a recognizable name.
+    service.beta.kubernetes.io/aws-load-balancer-name: production-rag-traefik
+
+    # Allow AWS Load Balancer Controller to manage the
+    # backend security-group rules required by the NLB.
+    service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
+
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+    expose:
+      default: true
+
+  websecure:
+    port: 8443
+    exposedPort: 443
+    expose:
+      default: true
+
+ingressClass:
+  enabled: true
+  isDefaultClass: false
+
+providers:
+  kubernetesCRD:
+    enabled: true
+
+  kubernetesIngress:
+    enabled: true

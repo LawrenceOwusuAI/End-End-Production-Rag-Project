@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rag-frontend
+  namespace: rag
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`www.lawrencemlprojects.info`)
+      services:
+        - name: rag-frontend
+          port: 8501
+  tls:
+    secretName: frontend-tls

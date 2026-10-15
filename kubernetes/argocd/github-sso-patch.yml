@@ -1,0 +1,9 @@
+data:
+  dex.config: |
+    connectors:
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: Ov23liythuKi8g9BO31q
+          clientSecret: $dex.github.clientSecret

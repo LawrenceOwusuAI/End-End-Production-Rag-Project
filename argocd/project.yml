@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+
+metadata:
+  name: production-rag
+  namespace: argocd
+
+spec:
+  description: Production RAG GitOps project
+
+  sourceRepos:
+    - "https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git"
+
+  destinations:
+    - namespace: rag
+      server: https://kubernetes.default.svc
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+
+    - group: ""
+      kind: Service
+
+    - group: "apps"
+      kind: Deployment

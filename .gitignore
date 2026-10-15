@@ -26,3 +26,8 @@ output/
 processed_output/
 kubernetes/secrets.yml
 *.pem
+kubernetes\argocd\AWS-load-balancer* 
+kubernetes\argocd\AWS-load-balancer-Traefik-certmanager-argocd-working-setup.tx 
+kubernetes/argocd/AWS-load-balancer* 
+terraform/cluster-information.txt
+terraform/cluster-information.txt
