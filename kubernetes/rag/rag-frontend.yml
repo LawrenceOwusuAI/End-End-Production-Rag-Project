@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: rag-frontend
   namespace: rag
+  annotations:
+    gitops-test: "enabled"
 
 spec:
 
