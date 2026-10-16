@@ -20,7 +20,7 @@ permissions:
 # PREVENT MULTIPLE DEPLOYMENTS FROM RACING EACH OTHER
 concurrency:
   group: production-rag-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
 
