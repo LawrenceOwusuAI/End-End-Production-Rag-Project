@@ -241,7 +241,10 @@ jobs:
           vuln-type: "os,library"
           severity: "HIGH,CRITICAL"
           scanners: "vuln"
+          trivyignores: ""
           version: "v0.76.0"
+          env:
+            TRIVY_DISABLE_ANALYZERS: "sbom"
       
 
 
