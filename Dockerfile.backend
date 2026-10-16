@@ -7,6 +7,7 @@ ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/app/.cache/huggingface
 
 # System dependencies
+# System dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -15,11 +16,15 @@ RUN apt-get update && \
         libgl1 \
         libglib2.0-0 \
         tesseract-ocr && \
-        rm -rf /var/lib/apt/lists/*\
-        && \
-        pip check\
-        && \
-        rm -f /usr/local/lib/python3.11/site-packages/pip/_vendor/bom.cdx.json
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade \
+    pip \
+    "setuptools>=84.0.0" \
+    "wheel>=0.46.2" \
+    "msgpack>=1.2.1" \
+    "urllib3>=2.8.0"
         
         
 
@@ -47,12 +52,18 @@ RUN pip install --no-cache-dir \
 
 # Install spaCy model required by NeMo PII masking
 RUN python -m spacy download en_core_web_lg
+
+# Install spaCy model required by NeMo PII masking
+RUN python -m spacy download en_core_web_lg
+
 RUN pip install --no-cache-dir --upgrade \
     "setuptools>=84.0.0" \
     "wheel>=0.46.2" \
     "msgpack>=1.2.1" \
     "urllib3>=2.8.0" && \
-    pip check
+    pip check && \
+    rm -f /usr/local/lib/python3.11/site-packages/pip/_vendor/bom.cdx.json
+
 # Copy application files
 COPY app.py .
 COPY chunking.py .
