@@ -241,7 +241,7 @@ jobs:
           vuln-type: "os,library"
           severity: "HIGH,CRITICAL"
           scanners: "vuln"
-          version: "0.74.0"
+          version: "v0.76.0"
       
 
 
