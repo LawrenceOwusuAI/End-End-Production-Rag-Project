@@ -16,10 +16,12 @@ RUN apt-get update && \
         libglib2.0-0 \
         tesseract-ocr && \
         rm -rf /var/lib/apt/lists/*\
-        &&
-        pip check \
+        && \
+        pip check\
         && \
         rm -f /usr/local/lib/python3.11/site-packages/pip/_vendor/bom.cdx.json
+        
+        
 
 # Upgrade pip
 
