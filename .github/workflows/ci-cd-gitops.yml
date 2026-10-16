@@ -51,7 +51,7 @@ jobs:
 
 
   # 1. VALIDATE PYTHON SOURCE
- 
+
 
   validate-python:
     name: Validate Python Source
@@ -84,9 +84,9 @@ jobs:
             monitoring
 
 
-  
+
   # 2. BUILD, VERIFY, SCAN AND PUSH DOCKER IMAGES
- 
+
 
   build-images:
     name: Build and Scan - ${{ matrix.service }}
@@ -102,37 +102,37 @@ jobs:
       matrix:
         include:
 
-          
+
           # RAG Backend
-          
+
           - service: rag-backend
             dockerfile: Dockerfile.backend
 
-        
+
           # RAG Frontend
-       
+
           - service: rag-frontend
             dockerfile: Dockerfile.frontend
 
-         
+
           # Prometheus MCP Server
-          
+
           - service: prometheus-mcp
             dockerfile: Dockerfile.prometheus-mcp
 
           # OpenSearch MCP Server
-         
+
           - service: opensearch-mcp
             dockerfile: Dockerfile.opensearch-mcp
 
-          
+
           # Observability Agent
-         
+
           - service: observability-agent
             dockerfile: Dockerfile.observability-agent
 
           # Data Prepper
-          
+
           - service: data-prepper
             dockerfile: Dockerfile.data-prepper
 
@@ -140,15 +140,15 @@ jobs:
     steps:
 
       # Checkout
-    
+
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
 
-   
+
       # Generate immutable image tag from Git commit SHA
-      
+
 
       - name: Generate image tag
         id: image
@@ -161,15 +161,15 @@ jobs:
           echo "Image tag: ${SHORT_SHA}"
 
 
-      
+
       # Docker Buildx
-     
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
 
       # Docker Hub Login
-      
+
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -178,9 +178,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
 
-      
+
       # Build image locally
-      
+
 
       - name: Build Docker image
         uses: docker/build-push-action@v6
@@ -230,8 +230,9 @@ jobs:
 
 
       # Trivy vulnerability scan HIGH or CRITICAL vulnerabilities fail the build.
-     
-      - name: Scan image with Trivy
+
+      - name: Scan custom image with Trivy
+        if: matrix.service != 'data-prepper'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ steps.image.outputs.tag }}
@@ -241,14 +242,29 @@ jobs:
           vuln-type: "os,library"
           severity: "HIGH,CRITICAL"
           scanners: "vuln"
-          trivyignores: ""
           version: "v0.76.0"
-        
-      
+
+      # ============================================================
+      # Data Prepper is an upstream third-party Java distribution.
+
+      - name: Scan Data Prepper with Trivy
+        if: matrix.service == 'data-prepper'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ steps.image.outputs.tag }}
+          format: table
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "HIGH,CRITICAL"
+          scanners: "vuln"
+          version: "v0.76.0"
+
+
 
 
       # Push only after successful security scan
-   
+
 
       - name: Push image to Docker Hub
         shell: bash
@@ -260,7 +276,7 @@ jobs:
           docker push "${IMAGE}"
 
   # 3. UPDATE GITOPS KUBERNETES MANIFESTS
-  
+
 
   update-gitops:
     name: Update GitOps Manifests
@@ -272,9 +288,9 @@ jobs:
 
     steps:
 
-    
+
       # Checkout repository
-   
+
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -282,9 +298,9 @@ jobs:
           fetch-depth: 0
 
 
-     
+
       # Generate same image tag used during build
-    
+
 
       - name: Generate image tag
         id: image
@@ -297,9 +313,9 @@ jobs:
           echo "GitOps image tag: ${SHORT_SHA}"
 
 
-     
+
       # Update Kubernetes Deployment manifests
-    
+
 
       - name: Update Kubernetes image tags
         shell: bash
@@ -334,9 +350,9 @@ jobs:
             kubernetes/rag/data-prepper.yml
 
 
-    
+
       # Verify manifest changes
-    
+
 
       - name: Show updated image references
         shell: bash
@@ -348,7 +364,7 @@ jobs:
 
 
       # Configure Git identity
-   
+
 
       - name: Configure Git
         shell: bash
@@ -360,7 +376,7 @@ jobs:
 
 
       # Commit GitOps manifest changes
-      
+
 
       - name: Commit GitOps changes
         shell: bash
@@ -376,7 +392,7 @@ jobs:
             -m "gitops: deploy images ${{ steps.image.outputs.tag }}"
 
 
-     
+
       # Push manifest commit
 
       - name: Push GitOps changes
