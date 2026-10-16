@@ -102,7 +102,7 @@ jobs:
             dockerfile: Dockerfile.data-prepper
 
     steps:
--
+
       # Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
