@@ -35,7 +35,7 @@ mcp[cli]
 boto3
 botocore
 opensearch-py
-pyarrow==20.0.0
+pyarrow==23.0.1
 pandas
 numpy
 openai
@@ -59,3 +59,8 @@ presidio-anonymizer
 spacy 
 transformers 
 #terraform
+# Security constraints
+cryptography>=50.0.0
+fsspec>=2026.6.0
+msgpack>=1.2.1
+urllib3>=2.8.0
