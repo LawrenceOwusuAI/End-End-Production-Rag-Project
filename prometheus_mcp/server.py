@@ -1314,7 +1314,7 @@ async def get_rag_health_summary(
     )
     / 1024 / 1024
     """
--
+
     # AVERAGE RETRIEVAL LATENCY
   
     retrieval_latency_query = f"""
