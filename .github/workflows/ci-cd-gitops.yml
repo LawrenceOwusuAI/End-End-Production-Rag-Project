@@ -231,23 +231,18 @@ jobs:
 
       # Trivy vulnerability scan HIGH or CRITICAL vulnerabilities fail the build.
      
-
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ steps.image.outputs.tag }}
-
           format: table
-
           exit-code: "1"
-
           ignore-unfixed: true
-
           vuln-type: "os,library"
-
           severity: "HIGH,CRITICAL"
-
           scanners: "vuln"
+          trivy-version: "0.74.0"
+      
 
 
       # Push only after successful security scan
