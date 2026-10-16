@@ -27,7 +27,7 @@ spec:
 
         - name: rag-frontend
 
-          image: lawrenceowusuml/rag-frontend:1.0
+          image: lawrenceowusuml/rag-frontend:518d6994b382
 
           imagePullPolicy: IfNotPresent
 

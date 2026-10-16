@@ -25,7 +25,7 @@ spec:
 
         - name: rag-backend
 
-          image: lawrenceowusuml/rag-backend:1.0
+          image: lawrenceowusuml/rag-backend:518d6994b382
 
           imagePullPolicy: IfNotPresent
 
