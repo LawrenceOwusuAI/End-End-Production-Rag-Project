@@ -9,7 +9,6 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-
 RUN pip install \
     --no-cache-dir \
     --upgrade pip \
@@ -18,7 +17,18 @@ RUN pip install \
         --no-cache-dir \
         "mcp[cli]" \
         httpx \
-        python-dotenv
+        python-dotenv \
+    && \
+    pip install \
+        --no-cache-dir \
+        --upgrade \
+        "setuptools>=84.0.0" \
+        "wheel>=0.46.2" \
+        "msgpack>=1.2.1" \
+        "urllib3>=2.8.0" \
+    && \
+    pip check
+
 
 
 COPY prometheus_mcp ./prometheus_mcp

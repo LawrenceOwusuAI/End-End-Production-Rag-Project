@@ -18,8 +18,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" wheel
 
+RUN pip install --no-cache-dir --upgrade \
+    pip \
+    "setuptools>=84.0.0" \
+    "wheel>=0.46.2" \
+    "msgpack>=1.2.1" \
+    "urllib3>=2.8.0"
 # Copy requirements
 COPY requirements-ragas.txt .
 
@@ -36,7 +41,12 @@ RUN pip install --no-cache-dir \
 
 # Install spaCy model required by NeMo PII masking
 RUN python -m spacy download en_core_web_lg
-RUN pip check
+RUN pip install --no-cache-dir --upgrade \
+    "setuptools>=84.0.0" \
+    "wheel>=0.46.2" \
+    "msgpack>=1.2.1" \
+    "urllib3>=2.8.0" && \
+    pip check
 # Copy application files
 COPY app.py .
 COPY chunking.py .

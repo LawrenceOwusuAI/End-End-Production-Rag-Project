@@ -14,7 +14,17 @@ RUN pip install \
     && \
     pip install \
     --no-cache-dir \
-    -r requirements.frontend.txt
+    -r requirements.frontend.txt \
+    && \
+    pip install \
+    --no-cache-dir \
+    --upgrade \
+    "setuptools>=84.0.0" \
+    "wheel>=0.46.2" \
+    "msgpack>=1.2.1" \
+    "urllib3>=2.8.0" \
+    && \
+    pip check
 
 COPY streamlit_app1.py .
 

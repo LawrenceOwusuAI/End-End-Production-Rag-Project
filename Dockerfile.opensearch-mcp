@@ -14,7 +14,17 @@ RUN pip install \
         "mcp[cli]" \
         boto3 \
         opensearch-py \
-        python-dotenv
+        python-dotenv \
+    && \
+    pip install \
+        --no-cache-dir \
+        --upgrade \
+        "setuptools>=84.0.0" \
+        "wheel>=0.46.2" \
+        "msgpack>=1.2.1" \
+        "urllib3>=2.8.0" \
+    && \
+    pip check
 
 COPY opensearch_mcp ./opensearch_mcp
 
