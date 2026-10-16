@@ -9,7 +9,7 @@ spec:
   description: Production RAG GitOps project
 
   sourceRepos:
-    - "https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git"
+    - https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git
 
   destinations:
     - namespace: rag
@@ -22,5 +22,5 @@ spec:
     - group: ""
       kind: Service
 
-    - group: "apps"
+    - group: apps
       kind: Deployment

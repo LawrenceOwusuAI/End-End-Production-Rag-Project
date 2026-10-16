@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: production-monitoring
+  namespace: argocd
+
+spec:
+  description: Production monitoring GitOps project
+
+  sourceRepos:
+    - https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git
+
+  destinations:
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+
+  namespaceResourceWhitelist:
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+
+    - group: monitoring.coreos.com
+      kind: PrometheusRule
+
+    - group: monitoring.coreos.com
+      kind: AlertmanagerConfig

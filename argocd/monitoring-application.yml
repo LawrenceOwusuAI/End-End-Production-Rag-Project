@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: production-monitoring
+  namespace: argocd
+
+spec:
+  project: production-monitoring
+
+  source:
+    repoURL: https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git
+    targetRevision: main
+    path: kubernetes/monitoring
+
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
