@@ -24,7 +24,9 @@ RUN pip install \
     "msgpack>=1.2.1" \
     "urllib3>=2.8.0" \
     && \
-    pip check
+    pip check\
+    && \
+    rm -f /usr/local/lib/python3.11/site-packages/pip/_vendor/bom.cdx.json
 
 COPY streamlit_app1.py .
 

@@ -243,8 +243,7 @@ jobs:
           scanners: "vuln"
           trivyignores: ""
           version: "v0.76.0"
-        env:
-          TRIVY_DISABLE_ANALYZERS: "sbom"
+        
       
 
 
