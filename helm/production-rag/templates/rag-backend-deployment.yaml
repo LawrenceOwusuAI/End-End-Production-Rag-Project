@@ -18,6 +18,54 @@ spec:
         app: {{ .Values.backend.name }}
 
     spec:
+      initContainers:
+
+        - name: wait-for-postgresql
+
+          image: "postgres:16-alpine"
+
+          command:
+
+            - sh
+
+            - -c
+
+            - |
+              echo "Waiting for PostgreSQL..."
+
+              until pg_isready \
+                -h postgresql \
+                -p 5432 \
+                -U "$POSTGRES_USER" \
+                -d "$POSTGRES_DB"
+              do
+
+                echo "PostgreSQL is not ready yet..."
+
+                sleep 2
+
+              done
+
+              echo "PostgreSQL is ready."
+
+
+          env:
+
+            - name: POSTGRES_DB
+
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_DB
+
+
+            - name: POSTGRES_USER
+
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_USER
+      
       containers:
         - name: {{ .Values.backend.name }}
 
@@ -35,7 +83,40 @@ spec:
 
             - secretRef:
                 name: {{ .Values.backend.secretName }}
+           
+          env:
 
+            - name: POSTGRES_HOST
+              value: "postgresql"
+
+
+            - name: POSTGRES_PORT
+              value: "5432"
+
+
+            - name: POSTGRES_DB
+
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_DB
+
+
+            - name: POSTGRES_USER
+
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_USER
+
+
+            - name: POSTGRES_PASSWORD
+
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_PASSWORD
+          
           resources:
             requests:
               cpu: {{ .Values.backend.resources.requests.cpu | quote }}

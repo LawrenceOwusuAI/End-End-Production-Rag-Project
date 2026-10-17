@@ -58,9 +58,8 @@ presidio-analyzer
 presidio-anonymizer
 spacy 
 transformers 
-#terraform
-# Security constraints
 cryptography>=50.0.0
 fsspec>=2026.6.0
 msgpack>=1.2.1
 urllib3>=2.8.0
+psycopg[binary]>=3.2,<4

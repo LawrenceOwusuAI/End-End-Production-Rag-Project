@@ -50,3 +50,33 @@ configMap:
   data:
     ENVIRONMENT: "production"
     LOG_LEVEL: "INFO"
+
+
+postgresql:
+  enabled: true
+
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+  service:
+    name: postgresql
+    port: 5432
+
+  database: rag_auth
+  username: rag_user
+
+  storage:
+    size: 10Gi
+
+    storageClassName: "gp3"
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

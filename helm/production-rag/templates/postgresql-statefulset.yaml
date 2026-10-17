@@ -1,0 +1,190 @@
+{{- if .Values.postgresql.enabled }}
+
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: postgresql
+  namespace: rag
+
+spec:
+
+  serviceName: {{ .Values.postgresql.service.name }}
+
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgresql
+
+  template:
+
+    metadata:
+      labels:
+        app: postgresql
+
+    spec:
+
+      securityContext:
+        fsGroup: 999
+
+      containers:
+
+        - name: postgresql
+
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+
+          ports:
+
+            - name: postgresql
+              containerPort: 5432
+              protocol: TCP
+
+          # POSTGRES ENVIRONMENT
+          env:
+
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_DB
+
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_USER
+
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth-secret
+                  key: POSTGRES_PASSWORD
+
+
+            # Important when using a mounted volume.
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+
+          # PERSISTENT STORAGE
+
+          volumeMounts:
+
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+
+          # RESOURCES
+
+          resources:
+
+            requests:
+              cpu: {{ .Values.postgresql.resources.requests.cpu | quote }}
+              memory: {{ .Values.postgresql.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.postgresql.resources.limits.cpu | quote }}
+              memory: {{ .Values.postgresql.resources.limits.memory | quote }}
+
+          # STARTUP PROBE
+
+          startupProbe:
+
+            exec:
+              command:
+
+                - sh
+
+                - -c
+
+                - |
+                  pg_isready \
+                    -h 127.0.0.1 \
+                    -p 5432 \
+                    -U "$POSTGRES_USER" \
+                    -d "$POSTGRES_DB"
+
+            periodSeconds: 5
+
+            timeoutSeconds: 5
+
+            failureThreshold: 30
+
+          # READINESS PROBE
+          readinessProbe:
+
+            exec:
+              command:
+
+                - sh
+
+                - -c
+
+                - |
+                  pg_isready \
+                    -h 127.0.0.1 \
+                    -p 5432 \
+                    -U "$POSTGRES_USER" \
+                    -d "$POSTGRES_DB"
+
+            periodSeconds: 10
+
+            timeoutSeconds: 5
+
+            failureThreshold: 3
+
+          # LIVENESS PROBE
+
+          livenessProbe:
+
+            exec:
+              command:
+
+                - sh
+
+                - -c
+
+                - |
+                  pg_isready \
+                    -h 127.0.0.1 \
+                    -p 5432 \
+                    -U "$POSTGRES_USER" \
+                    -d "$POSTGRES_DB"
+
+            periodSeconds: 30
+
+            timeoutSeconds: 5
+
+            failureThreshold: 5
+
+  # PVC
+  volumeClaimTemplates:
+
+    - metadata:
+
+        name: postgres-data
+
+      spec:
+
+        accessModes:
+
+          - ReadWriteOnce
+
+
+        {{- if .Values.postgresql.storage.storageClassName }}
+
+        storageClassName: {{ .Values.postgresql.storage.storageClassName | quote }}
+
+        {{- end }}
+
+
+        resources:
+
+          requests:
+
+            storage: {{ .Values.postgresql.storage.size }}
+
+{{- end }}

@@ -5,7 +5,7 @@ pydantic
 python-dotenv
 requests
 httpx
-
+psycopg[binary]>=3.2,<4
 sqlalchemy
 pwdlib[argon2]
 PyJWT
