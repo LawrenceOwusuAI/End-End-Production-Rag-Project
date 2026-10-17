@@ -617,6 +617,99 @@ footer {
         hidden;
 }
 
+
+/* ========================================================
+   PROFESSIONAL PROFILE / PORTFOLIO TAB
+   ======================================================== */
+.profile-hero {
+    background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(238,242,255,0.95));
+    border: 1px solid #d9e2ec;
+    border-radius: 24px;
+    padding: 30px;
+    margin: 1rem 0 1.5rem 0;
+    box-shadow: 0 14px 38px rgba(30, 50, 80, 0.10);
+}
+
+.profile-name {
+    color: #172033;
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.2rem;
+}
+
+.profile-role {
+    color: #4338ca;
+    font-size: 1.12rem;
+    font-weight: 750;
+    margin-bottom: 1rem;
+}
+
+.profile-summary {
+    color: #405166;
+    font-size: 1rem;
+    line-height: 1.75;
+}
+
+.badge-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.skill-badge {
+    display: inline-block;
+    background: #eef2ff;
+    color: #3730a3;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.portfolio-card {
+    background: rgba(255,255,255,0.94);
+    border: 1px solid #d9e2ec;
+    border-radius: 18px;
+    padding: 20px;
+    margin: 0.7rem 0;
+    box-shadow: 0 8px 22px rgba(30, 50, 80, 0.06);
+}
+
+.portfolio-card h3 {
+    color: #172033;
+    margin-top: 0;
+    margin-bottom: 0.55rem;
+}
+
+.portfolio-card p,
+.portfolio-card li {
+    color: #46576a;
+    line-height: 1.7;
+}
+
+.portfolio-card a {
+    color: #364fc7 !important;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.portfolio-card a:hover {
+    text-decoration: underline;
+}
+
+.highlight-number {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #4338ca;
+}
+
+.highlight-label {
+    color: #607085;
+    font-size: 0.9rem;
+}
+
 </style>
 """,
 
@@ -966,11 +1059,12 @@ AI Research Platform Online
 
 # MAIN APPLICATION TABS
 
-rag_tab, observability_tab = (
+rag_tab, observability_tab, profile_tab = (
     st.tabs(
         [
             "📚 RAG Assistant",
             "📊 Observability Assistant",
+            "👨🏾‍💻 About Lawrence",
         ]
     )
 )
@@ -1681,3 +1775,465 @@ the approved MCP tools exposed by your servers.
                 st.session_state["observability_messages"] = []
 
                 st.rerun()
+
+# ============================================================\n# TAB 3 - PROFESSIONAL PROFILE / PORTFOLIO
+# ============================================================
+with profile_tab:
+
+    # LinkedIn can be overridden with an environment variable when deployed.
+    LINKEDIN_URL = os.getenv(
+        "LINKEDIN_URL",
+        "https://www.linkedin.com/in/lawrenceowusu1",
+    )
+
+    # Other professional links remain fixed in the application for now.
+    GITHUB_URL = "https://github.com/LawrenceOwusuAI"
+    RESEARCHGATE_URL = "https://www.researchgate.net/profile/Lawrence-Owusu-5"
+    ORCID_URL = "https://orcid.org/0009-0005-8150-2970"
+    RESUME_PATH = os.getenv(
+        "RESUME_PATH",
+        "Lawrence_Owusu_Resume.pdf",
+    )
+
+    # --------------------------------------------------------
+    # HERO / PROFESSIONAL BRAND
+    # --------------------------------------------------------
+    st.markdown(
+        """
+<div class="profile-hero">
+    <div class="profile-name">Lawrence Owusu</div>
+    <div class="profile-role">
+        Machine Learning Engineer • Generative AI Engineer • MLOps Engineer • Data Scientist
+    </div>
+    <div class="profile-summary">
+        Ph.D. candidate in Computational Data Science &amp; Engineering with a focus on
+        building reliable, secure and production-ready AI systems. My work spans
+        machine learning, generative AI, retrieval-augmented generation, MLOps,
+        cloud infrastructure, model observability and privacy-preserving deep learning.
+        I enjoy taking ideas from research and turning them into deployable systems.
+    </div>
+    <div class="badge-wrap">
+        <span class="skill-badge">Machine Learning</span>
+        <span class="skill-badge">Generative AI</span>
+        <span class="skill-badge">MLOps</span>
+        <span class="skill-badge">Data Science</span>
+        <span class="skill-badge">RAG</span>
+        <span class="skill-badge">LLM Systems</span>
+        <span class="skill-badge">AWS</span>
+        <span class="skill-badge">Kubernetes</span>
+    </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # QUICK PROFILE METRICS
+    # --------------------------------------------------------
+    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+
+    with metric_col1:
+        st.metric("AWS Certifications", "5×")
+
+    with metric_col2:
+        st.metric("Primary Focus", "ML / GenAI")
+
+    with metric_col3:
+        st.metric("Cloud", "AWS")
+
+    with metric_col4:
+        st.metric("Research", "AI Privacy")
+
+    # --------------------------------------------------------
+    # PROFESSIONAL LINKS
+    # --------------------------------------------------------
+    st.markdown("### 🔗 Professional Links")
+
+    link_col1, link_col2, link_col3, link_col4 = st.columns(4)
+
+    with link_col1:
+        st.link_button(
+            "LinkedIn",
+            LINKEDIN_URL,
+            use_container_width=True,
+        )
+
+    with link_col2:
+        st.link_button(
+            "GitHub",
+            GITHUB_URL,
+            use_container_width=True,
+        )
+
+    with link_col3:
+        st.link_button(
+            "ResearchGate",
+            RESEARCHGATE_URL,
+            use_container_width=True,
+        )
+
+    with link_col4:
+        st.link_button(
+            "ORCID",
+            ORCID_URL,
+            use_container_width=True,
+        )
+
+
+    # --------------------------------------------------------
+    # ABOUT + CAREER TARGET
+    # --------------------------------------------------------
+    about_col, target_col = st.columns(2)
+
+    with about_col:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>👋 About Me</h3>
+<p>
+I combine research depth with hands-on engineering. My interests include
+production machine-learning systems, LLM applications, retrieval systems,
+AI infrastructure, privacy-preserving machine learning and cloud-native deployment.
+</p>
+<p>
+I am especially interested in engineering AI systems that are accurate, observable,
+scalable, secure and maintainable after they move beyond the prototype stage.
+</p>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with target_col:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>🎯 Professional Focus</h3>
+<ul>
+    <li>Machine Learning Engineering</li>
+    <li>Generative AI / LLM Engineering</li>
+    <li>MLOps and ML Platform Engineering</li>
+    <li>Applied Data Science</li>
+    <li>Cloud-native AI systems</li>
+    <li>AI reliability, evaluation and observability</li>
+</ul>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # --------------------------------------------------------
+    # EDUCATION
+    # --------------------------------------------------------
+    st.markdown("### 🎓 Education")
+
+    st.markdown(
+        """
+<div class="portfolio-card">
+<h3>Ph.D. — Computational Data Science &amp; Engineering</h3>
+<p><strong>North Carolina A&amp;T State University</strong></p>
+<p>
+Research emphasis: privacy-preserving machine learning, variational autoencoders,
+information-theoretic analysis, membership-inference attacks and scalable AI systems.
+</p>
+<hr>
+<h3>M.S. — Data Science &amp; Engineering</h3>
+<p>Graduate training in data science, machine learning and computational engineering.</p>
+<hr>
+<h3>M.S. — Agricultural &amp; Environmental Systems</h3>
+<p>Interdisciplinary graduate training connecting analytical methods with real-world systems.</p>
+<hr>
+<h3>B.S. — Natural Resources Management</h3>
+<p>Foundation in environmental and natural-resource systems.</p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # CORE TECHNICAL SKILLS
+    # --------------------------------------------------------
+    st.markdown("### 🧰 Technical Skills")
+
+    skill_col1, skill_col2, skill_col3 = st.columns(3)
+
+    with skill_col1:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>🤖 ML & Data Science</h3>
+<ul>
+    <li>Python, SQL, NumPy, Pandas</li>
+    <li>Scikit-learn</li>
+    <li>TensorFlow / Keras</li>
+    <li>Deep Learning</li>
+    <li>Computer Vision</li>
+    <li>Feature Engineering</li>
+    <li>Model Evaluation</li>
+    <li>Statistical Analysis</li>
+</ul>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with skill_col2:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>🧠 Generative AI</h3>
+<ul>
+    <li>LLMs and Prompt Engineering</li>
+    <li>Retrieval-Augmented Generation</li>
+    <li>LangChain</li>
+    <li>MCP Servers / Tool Calling</li>
+    <li>Embedding Models</li>
+    <li>Reranking and Hybrid Retrieval</li>
+    <li>RAG Evaluation</li>
+    <li>AI Guardrails</li>
+</ul>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with skill_col3:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>⚙️ MLOps & Cloud</h3>
+<ul>
+    <li>AWS</li>
+    <li>Docker / Docker Compose</li>
+    <li>Kubernetes</li>
+    <li>Helm / Argo CD</li>
+    <li>GitHub Actions CI/CD</li>
+    <li>FastAPI / Streamlit</li>
+    <li>Prometheus / Grafana</li>
+    <li>OpenTelemetry / Logfire</li>
+</ul>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # --------------------------------------------------------
+    # CERTIFICATIONS
+    # --------------------------------------------------------
+    st.markdown("### ☁️ AWS Certifications")
+
+    st.markdown(
+        """
+<div class="portfolio-card">
+<ul>
+    <li><strong>AWS Certified Machine Learning — Specialty</strong></li>
+    <li><strong>AWS Certified Data Analytics — Specialty</strong></li>
+    <li><strong>AWS Certified Data Engineer — Associate</strong></li>
+    <li><strong>AWS Certified AI Practitioner</strong></li>
+    <li><strong>AWS Certified Cloud Practitioner</strong></li>
+</ul>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # EXPERIENCE / RESEARCH
+    # --------------------------------------------------------
+    st.markdown("### 💼 Experience & Research")
+
+    exp_col1, exp_col2 = st.columns(2)
+
+    with exp_col1:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>Graduate Research</h3>
+<p>
+Researching privacy-preserving deep-learning methods with emphasis on
+variational autoencoders, latent-space perturbation, membership-inference
+attacks and information-theoretic privacy analysis.
+</p>
+<p>
+The work combines algorithm design, experimental evaluation, statistical
+analysis and scientific publication.
+</p>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with exp_col2:
+        st.markdown(
+            """
+<div class="portfolio-card">
+<h3>Research & Technical Service</h3>
+<p>
+Experience reviewing technical research papers and communicating applied
+machine-learning research through journal articles, conference papers,
+presentations and collaborative projects.
+</p>
+<p>
+Research domains include cybersecurity, privacy-preserving AI, wildfire
+detection and machine-learning systems.
+</p>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # --------------------------------------------------------
+    # FEATURED ENGINEERING PROJECT
+    # --------------------------------------------------------
+    st.markdown("### 🚀 Featured Engineering Project")
+
+    st.markdown(
+        """
+<div class="portfolio-card">
+<h3>Production-Grade Retrieval-Augmented Generation Platform</h3>
+<p>
+Designed and engineered an end-to-end production RAG platform that combines
+retrieval quality, LLM reliability, security, observability and cloud-native deployment.
+</p>
+<ul>
+    <li>Streamlit frontend and FastAPI backend</li>
+    <li>Document parsing, chunking, embeddings and Pinecone vector search</li>
+    <li>Query rewriting, expansion, decomposition and multi-query retrieval</li>
+    <li>Reciprocal Rank Fusion and cross-encoder reranking</li>
+    <li>LLM gateway routing, retries, fallback and caching</li>
+    <li>Input/output safety guardrails and authentication</li>
+    <li>Prometheus metrics, logs, traces and Grafana dashboards</li>
+    <li>MCP-based observability agent for natural-language system diagnostics</li>
+    <li>Docker, Kubernetes, Helm, Argo CD and GitHub Actions</li>
+</ul>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.link_button(
+        "💻 View GitHub Projects",
+        GITHUB_URL,
+        use_container_width=True,
+    )
+
+    # --------------------------------------------------------
+    # DISSERTATION / RESEARCH FOCUS
+    # --------------------------------------------------------
+    st.markdown("### 🔬 Current Research Focus")
+
+    st.markdown(
+        """
+<div class="portfolio-card">
+<h3>Latent Space Stochastic Perturbation Scheduling (LSSPS)</h3>
+<p>
+My doctoral research investigates privacy-preserving variational autoencoders.
+LSSPS introduces scheduled stochastic perturbation into the VAE latent space to
+reduce privacy leakage while preserving reconstruction utility.
+</p>
+<ul>
+    <li>Membership-inference attack evaluation</li>
+    <li>Mutual-information estimation and privacy analysis</li>
+    <li>Privacy–utility trade-off analysis</li>
+    <li>Variational autoencoders and representation learning</li>
+    <li>Federated extensions and synthetic-data generation</li>
+</ul>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # PUBLICATIONS
+    # --------------------------------------------------------
+    st.markdown("### 📚 Selected Publications")
+
+    st.markdown(
+        """
+<div class="portfolio-card">
+<h3>Latent Space Stochastic Perturbation Schedule via Cosine Annealing Scheduler for Privacy-Preserving Variational Autoencoders</h3>
+<p>2025 Cyber Awareness and Research Symposium (CARS), IEEE.</p>
+<p>
+<a href="https://doi.org/10.1109/CARS67163.2025.11337387" target="_blank">
+Read publication / DOI →
+</a>
+</p>
+</div>
+
+<div class="portfolio-card">
+<h3>Speeding Up ML-based IDSs through Data Preprocessing Techniques</h3>
+<p>International Journal of Computer Applications, Vol. 187, No. 12, 2025.</p>
+<p>
+<a href="https://doi.org/10.5120/ijca2025925071" target="_blank">
+Read publication / DOI →
+</a>
+</p>
+</div>
+
+<div class="portfolio-card">
+<h3>Reduction of Misclassifications in Wildfire Detection: A Weighted Ensemble Deep Learning Approach</h3>
+<p>International Journal of Intelligent Systems and Applications, Vol. 16, No. 5, 2024.</p>
+<p>
+<a href="https://doi.org/10.5815/ijisa.2024.05.05" target="_blank">
+Read publication / DOI →
+</a>
+</p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # RESUME
+    # --------------------------------------------------------
+    st.markdown("### 📄 Resume")
+
+    if os.path.isfile(RESUME_PATH):
+
+        with open(RESUME_PATH, "rb") as resume_file:
+            resume_bytes = resume_file.read()
+
+        st.download_button(
+            label="⬇️ Download Resume",
+            data=resume_bytes,
+            file_name=os.path.basename(RESUME_PATH),
+            mime="application/pdf",
+            use_container_width=True,
+            key="profile_resume_download",
+        )
+
+    else:
+        st.info(
+            "Resume download is ready to use. Add "
+            f"`{RESUME_PATH}` beside the Streamlit app, or set the "
+            "`RESUME_PATH` environment variable to the PDF location."
+        )
+
+    # --------------------------------------------------------
+    # CONTACT / CALL TO ACTION
+    # --------------------------------------------------------
+    st.markdown("### 🤝 Let's Connect")
+
+    st.markdown(
+        """
+<div class="portfolio-card">
+<h3>Open to ML, Generative AI, MLOps and Data Science opportunities</h3>
+<p>
+I am interested in opportunities where I can build production AI systems,
+solve complex machine-learning problems and contribute across the full ML lifecycle —
+from experimentation and evaluation to deployment, monitoring and continuous improvement.
+</p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    contact_left, contact_center, contact_right = st.columns([1, 2, 1])
+
+    with contact_center:
+        st.link_button(
+            "Connect on LinkedIn",
+            LINKEDIN_URL,
+            use_container_width=True,
+        )
+
