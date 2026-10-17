@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Values.backend.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.backend.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.backend.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.backend.name }}
+
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.containerPort }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.backend.configMapName }}
+
+            - secretRef:
+                name: {{ .Values.backend.secretName }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.backend.resources.requests.cpu | quote }}
+              memory: {{ .Values.backend.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.backend.resources.limits.cpu | quote }}
+              memory: {{ .Values.backend.resources.limits.memory | quote }}
+
+          startupProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  import json, urllib.request
+                  d=json.load(
+                    urllib.request.urlopen(
+                      "http://127.0.0.1:{{ .Values.backend.containerPort }}/health"
+                    )
+                  )
+                  raise SystemExit(
+                    0 if d.get("status") == "healthy" else 1
+                  )
+
+            periodSeconds: {{ .Values.backend.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.startupProbe.failureThreshold }}
+
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  import json, urllib.request
+                  d=json.load(
+                    urllib.request.urlopen(
+                      "http://127.0.0.1:{{ .Values.backend.containerPort }}/health"
+                    )
+                  )
+                  raise SystemExit(
+                    0 if d.get("status") == "healthy" else 1
+                  )
+
+            periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.readinessProbe.failureThreshold }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.livenessProbe.path }}
+              port: {{ .Values.backend.livenessProbe.port }}
+
+            periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.livenessProbe.failureThreshold }}

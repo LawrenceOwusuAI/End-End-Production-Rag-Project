@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Values.prometheusMcp.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.prometheusMcp.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.prometheusMcp.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.prometheusMcp.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.prometheusMcp.name }}
+
+          image: "{{ .Values.prometheusMcp.image.repository }}:{{ .Values.prometheusMcp.image.tag }}"
+
+          imagePullPolicy: {{ .Values.prometheusMcp.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.prometheusMcp.containerPort }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.prometheusMcp.configMapName }}
+
+            - secretRef:
+                name: {{ .Values.prometheusMcp.secretName }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.prometheusMcp.resources.requests.cpu | quote }}
+              memory: {{ .Values.prometheusMcp.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.prometheusMcp.resources.limits.cpu | quote }}
+              memory: {{ .Values.prometheusMcp.resources.limits.memory | quote }}
+
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.prometheusMcp.readinessProbe.port }}
+
+            periodSeconds: {{ .Values.prometheusMcp.readinessProbe.periodSeconds }}

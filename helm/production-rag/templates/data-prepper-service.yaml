@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ .Values.dataPrepper.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  type: {{ .Values.dataPrepper.service.type }}
+
+  selector:
+    app: {{ .Values.dataPrepper.name }}
+
+  ports:
+    - name: api
+      port: {{ .Values.dataPrepper.service.api.port }}
+      targetPort: {{ .Values.dataPrepper.service.api.targetPort }}
+
+    - name: ingest
+      port: {{ .Values.dataPrepper.service.ingest.port }}
+      targetPort: {{ .Values.dataPrepper.service.ingest.targetPort }}

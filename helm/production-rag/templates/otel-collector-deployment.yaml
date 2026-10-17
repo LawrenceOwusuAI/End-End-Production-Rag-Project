@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Values.otelCollector.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.otelCollector.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.otelCollector.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.otelCollector.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.otelCollector.name }}
+
+          image: "{{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}"
+
+          imagePullPolicy: {{ .Values.otelCollector.image.pullPolicy }}
+
+          args:
+{{- range .Values.otelCollector.args }}
+            - {{ . | quote }}
+{{- end }}
+
+          ports:
+            - name: otlp-http
+              containerPort: {{ .Values.otelCollector.ports.otlpHttp }}
+
+            - name: prometheus
+              containerPort: {{ .Values.otelCollector.ports.prometheus }}
+
+          volumeMounts:
+            - name: config
+              mountPath: {{ .Values.otelCollector.mountPath }}
+              subPath: {{ .Values.otelCollector.subPath }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.otelCollector.resources.requests.cpu | quote }}
+              memory: {{ .Values.otelCollector.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.otelCollector.resources.limits.cpu | quote }}
+              memory: {{ .Values.otelCollector.resources.limits.memory | quote }}
+
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.otelCollector.readinessProbe.port }}
+
+            periodSeconds: {{ .Values.otelCollector.readinessProbe.periodSeconds }}
+
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.otelCollector.configMapName }}

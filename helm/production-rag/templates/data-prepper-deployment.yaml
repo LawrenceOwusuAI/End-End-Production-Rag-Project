@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Values.dataPrepper.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.dataPrepper.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.dataPrepper.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.dataPrepper.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.dataPrepper.name }}
+
+          image: "{{ .Values.dataPrepper.image.repository }}:{{ .Values.dataPrepper.image.tag }}"
+
+          imagePullPolicy: {{ .Values.dataPrepper.image.pullPolicy }}
+
+          ports:
+            - name: api
+              containerPort: {{ .Values.dataPrepper.ports.api }}
+
+            - name: ingest
+              containerPort: {{ .Values.dataPrepper.ports.ingest }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.dataPrepper.configMapName }}
+
+            - secretRef:
+                name: {{ .Values.dataPrepper.secretName }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.dataPrepper.resources.requests.cpu | quote }}
+              memory: {{ .Values.dataPrepper.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.dataPrepper.resources.limits.cpu | quote }}
+              memory: {{ .Values.dataPrepper.resources.limits.memory | quote }}
+
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.dataPrepper.readinessProbe.port }}
+
+            periodSeconds: {{ .Values.dataPrepper.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.dataPrepper.readinessProbe.failureThreshold }}

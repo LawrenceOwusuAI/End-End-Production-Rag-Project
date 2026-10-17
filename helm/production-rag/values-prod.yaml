@@ -1,0 +1,52 @@
+# PRODUCTION ENVIRONMENT OVERRIDES
+
+
+backend:
+  replicaCount: 1
+
+  image:
+    tag: "518d6994b382"
+
+
+frontend:
+  replicaCount: 1
+
+  image:
+    tag: "518d6994b382"
+
+  service:
+    nodePort: 30501
+
+
+prometheusMcp:
+  replicaCount: 1
+
+  image:
+    tag: "518d6994b382"
+
+
+opensearchMcp:
+  replicaCount: 1
+
+  image:
+    tag: "518d6994b382"
+
+
+observabilityAgent:
+  replicaCount: 1
+
+  image:
+    tag: "518d6994b382"
+
+
+dataPrepper:
+  replicaCount: 1
+
+  image:
+    tag: "518d6994b382"
+
+
+configMap:
+  data:
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"

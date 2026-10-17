@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Values.opensearchMcp.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.opensearchMcp.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.opensearchMcp.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.opensearchMcp.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.opensearchMcp.name }}
+
+          image: "{{ .Values.opensearchMcp.image.repository }}:{{ .Values.opensearchMcp.image.tag }}"
+
+          imagePullPolicy: {{ .Values.opensearchMcp.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.opensearchMcp.containerPort }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.opensearchMcp.configMapName }}
+
+            - secretRef:
+                name: {{ .Values.opensearchMcp.secretName }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.opensearchMcp.resources.requests.cpu | quote }}
+              memory: {{ .Values.opensearchMcp.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.opensearchMcp.resources.limits.cpu | quote }}
+              memory: {{ .Values.opensearchMcp.resources.limits.memory | quote }}
+
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.opensearchMcp.readinessProbe.port }}
+
+            periodSeconds: {{ .Values.opensearchMcp.readinessProbe.periodSeconds }}

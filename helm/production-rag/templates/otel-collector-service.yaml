@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ .Values.otelCollector.name }}
+  namespace: {{ .Values.namespace }}
+
+  labels:
+    app: {{ .Values.otelCollector.name }}
+    monitoring-job: {{ index .Values.otelCollector.service.labels "monitoring-job" }}
+
+spec:
+  type: {{ .Values.otelCollector.service.type }}
+
+  selector:
+    app: {{ .Values.otelCollector.name }}
+
+  ports:
+    - name: otlp-http
+      port: {{ .Values.otelCollector.service.otlpHttp.port }}
+      targetPort: {{ .Values.otelCollector.service.otlpHttp.targetPort }}
+
+    - name: prometheus
+      port: {{ .Values.otelCollector.service.prometheus.port }}
+      targetPort: {{ .Values.otelCollector.service.prometheus.targetPort }}

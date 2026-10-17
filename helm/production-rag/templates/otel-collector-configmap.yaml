@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: {{ .Values.otelCollector.configMapName }}
+  namespace: {{ .Values.namespace }}
+
+data:
+  config.yml: |
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: {{ .Values.otelCollector.config.otlpHttpEndpoint }}
+
+    processors:
+      memory_limiter:
+        check_interval: {{ .Values.otelCollector.config.memoryLimiter.checkInterval }}
+        limit_mib: {{ .Values.otelCollector.config.memoryLimiter.limitMiB }}
+        spike_limit_mib: {{ .Values.otelCollector.config.memoryLimiter.spikeLimitMiB }}
+
+      batch:
+        timeout: {{ .Values.otelCollector.config.batch.timeout }}
+        send_batch_size: {{ .Values.otelCollector.config.batch.sendBatchSize }}
+
+    exporters:
+      prometheus:
+        endpoint: {{ .Values.otelCollector.config.prometheusExporter.endpoint }}
+        enable_open_metrics: {{ .Values.otelCollector.config.prometheusExporter.enableOpenMetrics }}
+
+      debug:
+        verbosity: {{ .Values.otelCollector.config.debugExporter.verbosity }}
+
+    service:
+      pipelines:
+        metrics:
+          receivers:
+            - otlp
+
+          processors:
+            - memory_limiter
+            - batch
+
+          exporters:
+            - prometheus
+            - debug

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ .Values.opensearchMcp.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  type: {{ .Values.opensearchMcp.service.type }}
+
+  selector:
+    app: {{ .Values.opensearchMcp.name }}
+
+  ports:
+    - name: http
+      port: {{ .Values.opensearchMcp.service.port }}
+      targetPort: {{ .Values.opensearchMcp.service.targetPort }}

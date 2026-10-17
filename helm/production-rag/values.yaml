@@ -1,0 +1,352 @@
+namespace: rag
+
+backend:
+  name: rag-backend
+
+  replicaCount: 1
+
+  image:
+    repository: lawrenceowusuml/rag-backend
+    tag: "518d6994b382"
+    pullPolicy: IfNotPresent
+
+  containerPort: 8000
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+
+    limits:
+      cpu: "2"
+      memory: "6Gi"
+
+  startupProbe:
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 60
+
+  readinessProbe:
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 4
+
+  livenessProbe:
+    path: /health
+    port: 8000
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 5
+
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+
+frontend:
+  name: rag-frontend
+
+  replicaCount: 1
+
+  annotations:
+    gitops-test: "enabled"
+
+  image:
+    repository: lawrenceowusuml/rag-frontend
+    tag: "518d6994b382"
+    pullPolicy: IfNotPresent
+
+  containerPort: 8501
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  readinessProbe:
+    path: /_stcore/health
+    port: 8501
+    initialDelaySeconds: 10
+    periodSeconds: 15
+
+  livenessProbe:
+    path: /_stcore/health
+    port: 8501
+    initialDelaySeconds: 30
+    periodSeconds: 30
+
+  service:
+    type: NodePort
+    port: 8501
+    targetPort: 8501
+    nodePort: 30501
+
+
+prometheusMcp:
+  name: prometheus-mcp
+
+  replicaCount: 1
+
+  image:
+    repository: lawrenceowusuml/prometheus-mcp
+    tag: "518d6994b382"
+    pullPolicy: IfNotPresent
+
+  containerPort: 8001
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  readinessProbe:
+    port: 8001
+    periodSeconds: 10
+
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+
+
+prometheusExternal:
+  name: prometheus
+  type: ExternalName
+
+  externalName: kube-prometheus-stack-prometheus.monitoring.svc.cluster.local
+
+  port: 9090
+  targetPort: 9090
+
+
+opensearchMcp:
+  name: opensearch-mcp
+
+  replicaCount: 1
+
+  image:
+    repository: lawrenceowusuml/opensearch-mcp
+    tag: "518d6994b382"
+    pullPolicy: IfNotPresent
+
+  containerPort: 8002
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  readinessProbe:
+    port: 8002
+    periodSeconds: 10
+
+  service:
+    type: ClusterIP
+    port: 8002
+    targetPort: 8002
+
+
+observabilityAgent:
+  name: observability-agent
+
+  replicaCount: 1
+
+  image:
+    repository: lawrenceowusuml/observability-agent
+    tag: "518d6994b382"
+    pullPolicy: IfNotPresent
+
+  containerPort: 8003
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+  startupProbe:
+    path: /health
+    port: 8003
+    periodSeconds: 10
+    failureThreshold: 30
+
+  readinessProbe:
+    path: /health
+    port: 8003
+    periodSeconds: 15
+
+  livenessProbe:
+    path: /health
+    port: 8003
+    periodSeconds: 30
+
+  service:
+    type: ClusterIP
+    port: 8003
+    targetPort: 8003
+
+
+dataPrepper:
+  name: data-prepper
+
+  replicaCount: 1
+
+  image:
+    repository: lawrenceowusuml/data-prepper
+    tag: "518d6994b382"
+    pullPolicy: IfNotPresent
+
+  ports:
+    api: 4900
+    ingest: 21893
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+  readinessProbe:
+    port: 4900
+    periodSeconds: 15
+    failureThreshold: 10
+
+  service:
+    type: ClusterIP
+
+    api:
+      port: 4900
+      targetPort: 4900
+
+    ingest:
+      port: 21893
+      targetPort: 21893
+
+
+otelCollector:
+  name: otel-collector
+  configMapName: otel-collector-config
+
+  replicaCount: 1
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  args:
+    - "--config=/etc/otelcol-contrib/config.yml"
+
+  ports:
+    otlpHttp: 4318
+    prometheus: 9464
+
+  mountPath: /etc/otelcol-contrib/config.yml
+  subPath: config.yml
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  readinessProbe:
+    port: 4318
+    periodSeconds: 10
+
+  service:
+    type: ClusterIP
+
+    labels:
+      monitoring-job: rag-otel
+
+    otlpHttp:
+      port: 4318
+      targetPort: 4318
+
+    prometheus:
+      port: 9464
+      targetPort: 9464
+
+  config:
+    memoryLimiter:
+      checkInterval: 5s
+      limitMiB: 256
+      spikeLimitMiB: 64
+
+    batch:
+      timeout: 5s
+      sendBatchSize: 1024
+
+    prometheusExporter:
+      endpoint: 0.0.0.0:9464
+      enableOpenMetrics: true
+
+    debugExporter:
+      verbosity: basic
+
+    otlpHttpEndpoint: 0.0.0.0:4318
+
+
+configMap:
+  name: rag-config
+
+  data:
+    ENVIRONMENT: "production"
+
+    LOG_LEVEL: "INFO"
+
+    RAG_BACKEND_URL: "http://rag-backend:8000"
+
+    OBSERVABILITY_AGENT_URL: "http://observability-agent:8003"
+
+    PROMETHEUS_MCP_URL: "http://prometheus-mcp:8001/mcp"
+
+    OPENSEARCH_MCP_URL: "http://opensearch-mcp:8002/mcp"
+
+    PROMETHEUS_URL: "http://prometheus:9090"
+
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+
+    OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+
+    OBSERVABILITY_MODEL: "gpt-4.1-mini"

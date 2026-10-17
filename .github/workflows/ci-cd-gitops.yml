@@ -9,12 +9,13 @@ on:
     branches:
       - main
 
-    # Prevent the GitOps manifest commit created by this workflow
-    # from triggering another full image build.
+    # Prevent the GitOps-only commit created by this workflow from triggering another full image build.
     paths-ignore:
       - "kubernetes/**"
       - "argocd/**"
       - "**/*.md"
+      - "helm/production-rag/values-prod.yaml"
+
 
   workflow_dispatch:
 
@@ -314,77 +315,169 @@ jobs:
 
 
 
-      # Update Kubernetes Deployment manifests
+      # Update Helm production image tags
 
-
-      - name: Update Kubernetes image tags
+      - name: Update Helm production image tags
         shell: bash
         run: |
           TAG="${{ steps.image.outputs.tag }}"
-          USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+          VALUES_FILE="helm/production-rag/values-prod.yaml"
 
-          echo "Updating Kubernetes manifests to ${TAG}"
+          echo "Updating Helm production image tags to ${TAG}"
 
-          sed -i \
-            "s|image: ${USERNAME}/rag-backend:.*|image: ${USERNAME}/rag-backend:${TAG}|g" \
-            kubernetes/rag/rag-backend.yml
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
 
-          sed -i \
-            "s|image: ${USERNAME}/rag-frontend:.*|image: ${USERNAME}/rag-frontend:${TAG}|g" \
-            kubernetes/rag/rag-frontend.yml
+          tag = os.environ["IMAGE_TAG"]
+          path = Path("helm/production-rag/values-prod.yaml")
 
-          sed -i \
-            "s|image: ${USERNAME}/prometheus-mcp:.*|image: ${USERNAME}/prometheus-mcp:${TAG}|g" \
-            kubernetes/rag/prometheus-mcp.yml
+          services = {
+              "backend",
+              "frontend",
+              "prometheusMcp",
+              "opensearchMcp",
+              "observabilityAgent",
+              "dataPrepper",
+          }
 
-          sed -i \
-            "s|image: ${USERNAME}/opensearch-mcp:.*|image: ${USERNAME}/opensearch-mcp:${TAG}|g" \
-            kubernetes/rag/opensearch-mcp.yml
+          lines = path.read_text().splitlines()
 
-          sed -i \
-            "s|image: ${USERNAME}/observability-agent:.*|image: ${USERNAME}/observability-agent:${TAG}|g" \
-            kubernetes/rag/observability-agent.yml
+          current_service = None
+          inside_image = False
+          updated = set()
 
-          sed -i \
-            "s|image: ${USERNAME}/data-prepper:.*|image: ${USERNAME}/data-prepper:${TAG}|g" \
-            kubernetes/rag/data-prepper.yml
+          output = []
 
+          for line in lines:
+              # Detect top-level YAML section
+              top_level = re.match(r"^([A-Za-z0-9_-]+):\s*$", line)
 
+              if top_level:
+                  section = top_level.group(1)
 
-      # Verify manifest changes
+                  if section in services:
+                      current_service = section
+                  else:
+                      current_service = None
 
+                  inside_image = False
 
-      - name: Show updated image references
+              # Detect image: under one of our services
+              if current_service and re.match(r"^\s{2}image:\s*$", line):
+                  inside_image = True
+                  output.append(line)
+                  continue
+
+              # Replace image tag
+              if (
+                  current_service
+                  and inside_image
+                  and re.match(r"^\s{4}tag:\s*", line)
+              ):
+                  output.append(f'    tag: "{tag}"')
+                  updated.add(current_service)
+                  inside_image = False
+                  continue
+
+              output.append(line)
+
+          missing = services - updated
+
+          if missing:
+              raise SystemExit(
+                  "Failed to update image tags for: "
+                  + ", ".join(sorted(missing))
+              )
+
+          path.write_text("\n".join(output) + "\n")
+
+          print("Updated image tags:")
+          for service in sorted(updated):
+              print(f"  {service}: {tag}")
+          PY
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+
+      # Show updated Helm image tags
+
+      - name: Show updated Helm values
         shell: bash
         run: |
-          echo "Updated Kubernetes images:"
+          echo "Updated production Helm values:"
           echo
 
-          grep -R -n "image:" kubernetes/rag
+          grep -n -A3 "^backend:" \
+            helm/production-rag/values-prod.yaml
 
+          grep -n -A3 "^frontend:" \
+            helm/production-rag/values-prod.yaml
+
+          grep -n -A3 "^prometheusMcp:" \
+            helm/production-rag/values-prod.yaml
+
+          grep -n -A3 "^opensearchMcp:" \
+            helm/production-rag/values-prod.yaml
+
+          grep -n -A3 "^observabilityAgent:" \
+            helm/production-rag/values-prod.yaml
+
+          grep -n -A3 "^dataPrepper:" \
+            helm/production-rag/values-prod.yaml
+
+      # Install Helm
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+
+      # Validate Helm chart before GitOps commit
+
+      - name: Validate Helm chart
+        shell: bash
+        run: |
+          echo "Running Helm lint..."
+
+          helm lint ./helm/production-rag \
+            -f ./helm/production-rag/values-prod.yaml
+
+          echo
+          echo "Rendering production manifests..."
+
+          helm template production-rag \
+            ./helm/production-rag \
+            -f ./helm/production-rag/values-prod.yaml \
+            > /tmp/production-rag-rendered.yaml
+
+          echo
+          echo "Helm validation successful."
+
+          echo
+          echo "Rendered images:"
+
+          grep "image:" /tmp/production-rag-rendered.yaml
 
       # Configure Git identity
-
 
       - name: Configure Git
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
-
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
 
-      # Commit GitOps manifest changes
-
+      # Commit Helm GitOps change
 
       - name: Commit GitOps changes
         shell: bash
         run: |
-          git add kubernetes/rag/
+          git add helm/production-rag/values-prod.yaml
 
           if git diff --cached --quiet; then
-            echo "No GitOps manifest changes detected."
+            echo "No Helm GitOps changes detected."
             exit 0
           fi
 
@@ -392,8 +485,7 @@ jobs:
             -m "gitops: deploy images ${{ steps.image.outputs.tag }}"
 
 
-
-      # Push manifest commit
+      # Push GitOps commit
 
       - name: Push GitOps changes
         shell: bash

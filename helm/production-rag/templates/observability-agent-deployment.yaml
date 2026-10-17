@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Values.observabilityAgent.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.observabilityAgent.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.observabilityAgent.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.observabilityAgent.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.observabilityAgent.name }}
+
+          image: "{{ .Values.observabilityAgent.image.repository }}:{{ .Values.observabilityAgent.image.tag }}"
+
+          imagePullPolicy: {{ .Values.observabilityAgent.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.observabilityAgent.containerPort }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.observabilityAgent.configMapName }}
+
+            - secretRef:
+                name: {{ .Values.observabilityAgent.secretName }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.observabilityAgent.resources.requests.cpu | quote }}
+              memory: {{ .Values.observabilityAgent.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.observabilityAgent.resources.limits.cpu | quote }}
+              memory: {{ .Values.observabilityAgent.resources.limits.memory | quote }}
+
+          startupProbe:
+            httpGet:
+              path: {{ .Values.observabilityAgent.startupProbe.path }}
+              port: {{ .Values.observabilityAgent.startupProbe.port }}
+
+            periodSeconds: {{ .Values.observabilityAgent.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.observabilityAgent.startupProbe.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.observabilityAgent.readinessProbe.path }}
+              port: {{ .Values.observabilityAgent.readinessProbe.port }}
+
+            periodSeconds: {{ .Values.observabilityAgent.readinessProbe.periodSeconds }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.observabilityAgent.livenessProbe.path }}
+              port: {{ .Values.observabilityAgent.livenessProbe.port }}
+
+            periodSeconds: {{ .Values.observabilityAgent.livenessProbe.periodSeconds }}

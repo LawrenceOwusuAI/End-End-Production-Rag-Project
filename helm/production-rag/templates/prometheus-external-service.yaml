@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ .Values.prometheusExternal.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  type: {{ .Values.prometheusExternal.type }}
+
+  externalName: {{ .Values.prometheusExternal.externalName }}
+
+  ports:
+    - port: {{ .Values.prometheusExternal.port }}
+      targetPort: {{ .Values.prometheusExternal.targetPort }}
