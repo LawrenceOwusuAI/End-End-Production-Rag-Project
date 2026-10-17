@@ -5,14 +5,14 @@ backend:
   replicaCount: 1
 
   image:
-    tag: "1482ccee22fa"
+    tag: "d01734f33361"
 
 
 frontend:
   replicaCount: 1
 
   image:
-    tag: "1482ccee22fa"
+    tag: "d01734f33361"
 
   service:
     nodePort: 30501
@@ -22,28 +22,28 @@ prometheusMcp:
   replicaCount: 1
 
   image:
-    tag: "1482ccee22fa"
+    tag: "d01734f33361"
 
 
 opensearchMcp:
   replicaCount: 1
 
   image:
-    tag: "1482ccee22fa"
+    tag: "d01734f33361"
 
 
 observabilityAgent:
   replicaCount: 1
 
   image:
-    tag: "1482ccee22fa"
+    tag: "d01734f33361"
 
 
 dataPrepper:
   replicaCount: 1
 
   image:
-    tag: "1482ccee22fa"
+    tag: "d01734f33361"
 
 
 configMap:
