@@ -9,12 +9,13 @@ spec:
   project: production-rag
 
   source:
-    repoURL: "https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git"
+    repoURL: https://github.com/LawrenceOwusuAI/End-End-Production-Rag-Project.git
     targetRevision: main
-    path: kubernetes/rag
+    path: helm/production-rag
 
-    directory:
-      recurse: true
+    helm:
+      valueFiles:
+        - values-prod.yaml
 
   destination:
     server: https://kubernetes.default.svc
@@ -24,5 +25,6 @@ spec:
     automated:
       prune: true
       selfHeal: true
+
     syncOptions:
       - CreateNamespace=true
