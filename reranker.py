@@ -22,8 +22,8 @@ from observability import TimedCrossEncoderReranker,vector_db_error_counter,quer
 
 QUERY_MODEL = "gpt-4.1-mini"
 CROSS_ENCODER_MODEL = "BAAI/bge-reranker-base"
-BASE_K = 15
-MAX_CANDIDATES = 15
+BASE_K = 8
+MAX_CANDIDATES = 6
 FINAL_TOP_N = 4
 RRF_K = 60
 
