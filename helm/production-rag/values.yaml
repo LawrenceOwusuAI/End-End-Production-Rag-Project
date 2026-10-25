@@ -270,7 +270,7 @@ weatherAgent:
   containerPort: 8085
 
   configMapName: rag-config
-  secretName: rag-secrets
+  secretName: weather-agent-secrets
 
   resources:
     requests:
