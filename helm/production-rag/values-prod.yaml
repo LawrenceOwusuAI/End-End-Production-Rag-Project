@@ -84,4 +84,4 @@ postgresql:
 weatherAgent:
   replicaCount: 1
   image:
-    tag: "latest"
+    tag: "dev"
