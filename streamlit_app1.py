@@ -2699,7 +2699,7 @@ with weather_tab:
         daily_df = prepare_daily_dataframe(data)
 
         st.markdown(
-            f"## 📍 {st.session_state["weather_location_name"]}"
+            f"## 📍 {st.session_state['weather_location_name']}"
         )
 
         current = data.get("current", {})

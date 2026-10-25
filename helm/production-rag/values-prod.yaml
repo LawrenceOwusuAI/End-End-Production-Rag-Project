@@ -12,7 +12,7 @@ frontend:
   replicaCount: 1
 
   image:
-    tag: weather-v2
+    tag: weather-v3
 
   service:
     nodePort: 30501
