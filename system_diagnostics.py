@@ -69,11 +69,11 @@
 
 #What documents were retrieved?
 
-Show me the slowest recent trace.
+#Show me the slowest recent trace.
 
 #Which stage caused the latency?
 
-Show me recent Pinecone errors.
+#Show me recent Pinecone errors.
 
 #Show me recent LLM gateway errors.
 
