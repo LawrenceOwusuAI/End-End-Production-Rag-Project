@@ -5,7 +5,11 @@ backend:
   replicaCount: 1
 
   image:
+<<<<<<< HEAD
     tag: "878549ffd8b3"
+=======
+    tag: "presidio-fix-v2"
+>>>>>>> b32cfa1 (Deploy RAG backend with Presidio spaCy fix)
 
 
 frontend:
