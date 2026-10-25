@@ -258,6 +258,44 @@ dataPrepper:
       port: 21893
       targetPort: 21893
 
+weatherAgent:
+  name: ghana-weather-api
+  replicaCount: 1
+
+  image:
+    repository: lawrenceowusuml/ghana-weather-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  containerPort: 8085
+
+  configMapName: rag-config
+  secretName: rag-secrets
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  readinessProbe:
+    path: /health
+    port: 8085
+    initialDelaySeconds: 10
+    periodSeconds: 15
+
+  livenessProbe:
+    path: /health
+    port: 8085
+    initialDelaySeconds: 30
+    periodSeconds: 30
+
+  service:
+    type: ClusterIP
+    port: 8085
+    targetPort: 8085
 
 otelCollector:
   name: otel-collector
@@ -350,3 +388,5 @@ configMap:
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
 
     OBSERVABILITY_MODEL: "gpt-4.1-mini"
+
+    WEATHER_BASE_URL: "http://ghana-weather-api:8085"

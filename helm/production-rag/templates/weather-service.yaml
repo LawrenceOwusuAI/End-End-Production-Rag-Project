@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.weatherAgent.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  type: {{ .Values.weatherAgent.service.type }}
+
+  selector:
+    app: {{ .Values.weatherAgent.name }}
+
+  ports:
+    - name: http
+      port: {{ .Values.weatherAgent.service.port }}
+      targetPort: {{ .Values.weatherAgent.service.targetPort }}
+      protocol: TCP

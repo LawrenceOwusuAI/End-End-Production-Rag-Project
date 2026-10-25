@@ -80,3 +80,8 @@ postgresql:
     limits:
       cpu: "500m"
       memory: "512Mi"
+
+weatherAgent:
+  replicaCount: 1
+  image:
+    tag: "latest"

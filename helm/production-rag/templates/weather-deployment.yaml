@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.weatherAgent.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  replicas: {{ .Values.weatherAgent.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.weatherAgent.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.weatherAgent.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.weatherAgent.name }}
+
+          image: "{{ .Values.weatherAgent.image.repository }}:{{ .Values.weatherAgent.image.tag }}"
+
+          imagePullPolicy: {{ .Values.weatherAgent.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.weatherAgent.containerPort }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.weatherAgent.configMapName }}
+
+            - secretRef:
+                name: {{ .Values.weatherAgent.secretName }}
+
+          resources:
+            {{- toYaml .Values.weatherAgent.resources | nindent 12 }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.weatherAgent.readinessProbe.path }}
+              port: {{ .Values.weatherAgent.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.weatherAgent.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.weatherAgent.readinessProbe.periodSeconds }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.weatherAgent.livenessProbe.path }}
+              port: {{ .Values.weatherAgent.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.weatherAgent.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.weatherAgent.livenessProbe.periodSeconds }}
