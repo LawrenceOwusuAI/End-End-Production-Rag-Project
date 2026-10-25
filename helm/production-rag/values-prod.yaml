@@ -5,14 +5,14 @@ backend:
   replicaCount: 1
 
   image:
-    tag: "5c3a96c8303a"
+    tag: "878549ffd8b3"
 
 
 frontend:
   replicaCount: 1
 
   image:
-    tag: weather-v3
+    tag: "878549ffd8b3"
 
   service:
     nodePort: 30501
@@ -22,28 +22,28 @@ prometheusMcp:
   replicaCount: 1
 
   image:
-    tag: "5c3a96c8303a"
+    tag: "878549ffd8b3"
 
 
 opensearchMcp:
   replicaCount: 1
 
   image:
-    tag: "5c3a96c8303a"
+    tag: "878549ffd8b3"
 
 
 observabilityAgent:
   replicaCount: 1
 
   image:
-    tag: "5c3a96c8303a"
+    tag: "878549ffd8b3"
 
 
 dataPrepper:
   replicaCount: 1
 
   image:
-    tag: "5c3a96c8303a"
+    tag: "878549ffd8b3"
 
 
 configMap:
