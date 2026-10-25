@@ -34,6 +34,9 @@ spec:
 
             - secretRef:
                 name: {{ .Values.weatherAgent.secretName }}
+          env:
+            - name: RAG_AUTH_ME_URL
+              value: "http://rag-backend:8000/auth/me"
 
           resources:
             {{- toYaml .Values.weatherAgent.resources | nindent 12 }}

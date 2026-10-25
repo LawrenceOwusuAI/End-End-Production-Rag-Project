@@ -265,7 +265,7 @@ weatherAgent:
   image:
     repository: lawrenceowusuml/ghana-weather-api
     tag: "dev"
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   containerPort: 8085
 
