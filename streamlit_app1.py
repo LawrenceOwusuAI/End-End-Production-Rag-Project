@@ -1,4 +1,10 @@
 import os
+import re
+import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -9,6 +15,8 @@ DOCUMENTS_API_URL = f"{BASE_API_URL}/documents"
 REGISTER_API_URL = f"{BASE_API_URL}/auth/register"
 LOGIN_API_URL = f"{BASE_API_URL}/auth/login"
 ME_API_URL = f"{BASE_API_URL}/auth/me"
+WEATHER_BASE_URL = os.getenv("WEATHER_API_URL", "http://ghana-weather-api:8085").rstrip("/")
+WEATHER_CHAT_API_URL = f"{WEATHER_BASE_URL}/api/v1/chat"
 
 # OBSERVABILITY AGENT BACKEND
 OBSERVABILITY_BASE_URL = os.getenv("OBSERVABILITY_BASE_URL","http://127.0.0.1:8003")
@@ -20,7 +28,7 @@ st.set_page_config(page_title=
        "AI Research Assistant",
        page_icon="🤖",
        layout="wide",
-       initial_sidebar_state="collapsed",
+       initial_sidebar_state="expanded",
 )
 
 # SESSION STATE
@@ -30,6 +38,17 @@ if "user" not in st.session_state:
     st.session_state["user"] = None
 if "observability_messages" not in st.session_state:
     st.session_state["observability_messages"] = []
+if "weather_messages" not in st.session_state:
+    st.session_state["weather_messages"] = []
+if "weather_conversation_id" not in st.session_state:
+    st.session_state["weather_conversation_id"] = None
+
+if "weather_forecast_data" not in st.session_state:
+    st.session_state["weather_forecast_data"] = None
+if "weather_location_name" not in st.session_state:
+    st.session_state["weather_location_name"] = None
+if "weather_pending_prompt" not in st.session_state:
+    st.session_state["weather_pending_prompt"] = None
 
 # CUSTOM CSS
 st.markdown(
@@ -747,6 +766,312 @@ def login_user(email,password):
     except requests.RequestException:
         return None
 
+# WEATHER AGENT CLIENT - REUSES THE RAG LOGIN JWT
+def ask_weather_agent(message: str, conversation_id=None):
+    token = st.session_state.get("access_token")
+    if not token:
+        raise RuntimeError("Your session has expired. Please log in again.")
+
+    payload = {"message": message}
+    if conversation_id:
+        payload["conversation_id"] = conversation_id
+
+    response = requests.post(
+        WEATHER_CHAT_API_URL,
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=90,
+    )
+    if response.status_code == 401:
+        raise RuntimeError("Your session has expired. Please log in again.")
+    response.raise_for_status()
+    return response.json()
+
+
+# WEATHER FORECAST HELPERS FROM THE ORIGINAL GHANA WEATHER INTELLIGENCE APP
+GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+GHANA_TIMEZONE = "Africa/Accra"
+
+WEATHER_CODES = {
+    0: ("☀️", "Clear sky"),
+    1: ("🌤️", "Mainly clear"),
+    2: ("⛅", "Partly cloudy"),
+    3: ("☁️", "Overcast"),
+    45: ("🌫️", "Fog"),
+    48: ("🌫️", "Depositing rime fog"),
+    51: ("🌦️", "Light drizzle"),
+    53: ("🌦️", "Moderate drizzle"),
+    55: ("🌧️", "Dense drizzle"),
+    56: ("🌧️", "Light freezing drizzle"),
+    57: ("🌧️", "Dense freezing drizzle"),
+    61: ("🌦️", "Slight rain"),
+    63: ("🌧️", "Moderate rain"),
+    65: ("🌧️", "Heavy rain"),
+    66: ("🌧️", "Light freezing rain"),
+    67: ("🌧️", "Heavy freezing rain"),
+    71: ("🌨️", "Slight snow"),
+    73: ("🌨️", "Moderate snow"),
+    75: ("❄️", "Heavy snow"),
+    77: ("❄️", "Snow grains"),
+    80: ("🌦️", "Slight rain showers"),
+    81: ("🌧️", "Moderate rain showers"),
+    82: ("⛈️", "Violent rain showers"),
+    85: ("🌨️", "Slight snow showers"),
+    86: ("🌨️", "Heavy snow showers"),
+    95: ("⛈️", "Thunderstorm"),
+    96: ("⛈️", "Thunderstorm with slight hail"),
+    99: ("⛈️", "Thunderstorm with heavy hail"),
+}
+
+
+def describe_weather(code):
+    try:
+        return WEATHER_CODES.get(
+            int(code),
+            ("🌤️", "Unknown"),
+        )
+    except (ValueError, TypeError):
+        return ("🌤️", "Unavailable")
+
+
+# ============================================================
+# 5. GEOCODING
+# ============================================================
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_coordinates(city):
+    response = requests.get(
+        GEOCODING_URL,
+        params={
+            "name": city,
+            "count": 20,
+            "language": "en",
+            "format": "json",
+            "countryCode": "GH",
+        },
+        timeout=20,
+    )
+
+    response.raise_for_status()
+
+    results = response.json().get("results", [])
+
+    if not results:
+        raise ValueError(
+            f"Could not find '{city}' in Ghana."
+        )
+
+    # Prefer a populated match; do not silently
+    # select a different country.
+    results.sort(
+        key=lambda item: item.get("population") or 0,
+        reverse=True,
+    )
+
+    return results[0]
+
+
+# ============================================================
+# 6. HOURLY WEATHER API
+# ============================================================
+
+@st.cache_data(ttl=900, show_spinner=False)
+def get_hourly_forecast(
+    latitude,
+    longitude,
+    forecast_days,
+):
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone": GHANA_TIMEZONE,
+        "forecast_days": forecast_days,
+        "current": [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "apparent_temperature",
+            "precipitation",
+            "rain",
+            "weather_code",
+            "wind_speed_10m",
+        ],
+        "hourly": [
+            "temperature_2m",
+            "apparent_temperature",
+            "relative_humidity_2m",
+            "precipitation_probability",
+            "precipitation",
+            "rain",
+            "showers",
+            "weather_code",
+            "cloud_cover",
+            "wind_speed_10m",
+            "wind_gusts_10m",
+        ],
+        "daily": [
+            "weather_code",
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "precipitation_sum",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+        ],
+    }
+
+    response = requests.get(
+        FORECAST_URL,
+        params=params,
+        timeout=30,
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+# ============================================================
+# 7. DATAFRAME PREPARATION
+# ============================================================
+
+def prepare_hourly_dataframe(data):
+    hourly = data.get("hourly", {})
+
+    df = pd.DataFrame(hourly)
+
+    if df.empty:
+        return df
+
+    df["time"] = pd.to_datetime(df["time"])
+    df["date"] = df["time"].dt.date
+    df["hour"] = df["time"].dt.strftime("%I:%M %p")
+
+    df["condition"] = df["weather_code"].apply(
+        lambda code: " ".join(
+            describe_weather(code)
+        )
+    )
+
+    return df
+
+
+def prepare_daily_dataframe(data):
+    daily = data.get("daily", {})
+
+    df = pd.DataFrame(daily)
+
+    if df.empty:
+        return df
+
+    df["time"] = pd.to_datetime(
+        df["time"]
+    ).dt.date
+
+    df["condition"] = df["weather_code"].apply(
+        lambda code: " ".join(
+            describe_weather(code)
+        )
+    )
+
+    return df
+
+
+# ============================================================
+# 8. AI AGENT COMMUNICATION
+# ============================================================
+
+# ============================================================
+# 9. FORMAT AI ANSWERS WITH WEATHER ICONS
+# ============================================================
+
+WEATHER_LABELS = [
+    (
+        r"rain probability|precipitation probability|"
+        r"chance of rain",
+        "🌧️",
+    ),
+    (
+        r"rainfall|precipitation amount",
+        "💧",
+    ),
+    (
+        r"humidity",
+        "💦",
+    ),
+    (
+        r"wind|gust",
+        "💨",
+    ),
+    (
+        r"temperature|max temp|min temp|feels.like",
+        "🌡️",
+    ),
+    (
+        r"condition|weather",
+        "🌤️",
+    ),
+]
+
+
+def format_ai_answer(answer):
+    lines = []
+
+    for line in answer.splitlines():
+        stripped = line.strip()
+
+        if not stripped:
+            lines.append("")
+            continue
+
+        # Handle Markdown list items.
+        match = re.match(
+            r"^(\s*(?:[-*]\s+|\d+\.\s+)?)(.*)$",
+            line,
+        )
+
+        if not match:
+            lines.append(line)
+            continue
+
+        prefix, content = match.groups()
+
+        plain = content.replace("**", "").strip()
+        label = plain.split(":", 1)[0]
+
+        if len(label) > 65:
+            lines.append(line)
+            continue
+
+        icon = None
+
+        for pattern, symbol in WEATHER_LABELS:
+            if re.search(
+                pattern,
+                label,
+                re.IGNORECASE,
+            ):
+                icon = symbol
+                break
+
+        if icon:
+            lines.append(
+                f"{prefix}{icon} {content}"
+            )
+        else:
+            lines.append(line)
+
+    return "\n".join(lines)
+
+
+
+
+# Scoped weather dashboard styling (preserves existing RAG theme)
+st.markdown("""<style>
+.ghana-weather-hero {background:linear-gradient(115deg,#dbeafe,#dcfce7);padding:28px 32px;border-radius:20px;border:1px solid #bfdbfe;margin-bottom:20px;}
+.ghana-weather-hero h1 {color:#075985;font-size:2.2rem;font-weight:800;margin:0;}
+.ghana-weather-hero p {color:#334155;margin-top:10px;}
+</style>""",unsafe_allow_html=True)
+
 # AUTHENTICATION PAGE
 if not st.session_state["access_token"]:
     st.markdown(
@@ -1013,8 +1338,30 @@ with st.sidebar:
         st.session_state["user"] = None
 
         st.session_state["observability_messages"] = []
+        st.session_state["weather_messages"] = []
+        st.session_state["weather_conversation_id"] = None
+        st.session_state["weather_forecast_data"] = None
+        st.session_state["weather_location_name"] = None
+        st.session_state["weather_pending_prompt"] = None
 
         st.rerun()
+
+    st.divider()
+    with st.expander("🇬🇭 Ghana Weather · Location & Forecast", expanded=True):
+        weather_cities = ["Accra", "Kumasi", "Tamale", "Takoradi", "Cape Coast",
+            "Koforidua", "Ho", "Sunyani", "Bolgatanga", "Wa", "Tema",
+            "Obuasi", "Techiman", "Akim Oda", "Paga", "Other location"]
+        weather_selected_city = st.selectbox("📍 Select a location", weather_cities, key="weather_selected_city")
+        weather_custom_city = ""
+        if weather_selected_city == "Other location":
+            weather_custom_city = st.text_input("Enter a town or city in Ghana",
+                placeholder="e.g. Tarkwa, Nsawam", key="weather_custom_city")
+        weather_location = (weather_custom_city.strip() if weather_selected_city == "Other location"
+            else weather_selected_city)
+        weather_forecast_days = st.slider("📅 Forecast duration (days)", 1, 10, 3,
+            key="weather_forecast_days")
+        weather_get_forecast = st.button("🌤️ Get hourly forecast",
+            use_container_width=True, type="primary", key="weather_get_forecast")
 
 # HEADER
 
@@ -1059,12 +1406,13 @@ AI Research Platform Online
 
 # MAIN APPLICATION TABS
 
-rag_tab, observability_tab, profile_tab = (
+rag_tab, observability_tab, profile_tab, weather_tab = (
     st.tabs(
         [
             "📚 RAG Assistant",
             "📊 Observability Assistant",
             "👨🏾‍💻 About Lawrence",
+            "🌤️ Ghana Weather AI",
         ]
     )
 )
@@ -2237,3 +2585,428 @@ from experimentation and evaluation to deployment, monitoring and continuous imp
             use_container_width=True,
         )
 
+
+
+# ============================================================
+# TAB 4 - GHANA WEATHER INTELLIGENCE (ORIGINAL DASHBOARD)
+# ============================================================
+with weather_tab:
+    st.markdown(
+        """
+        <div class="ghana-weather-hero">
+            <h1>🌤️ Ghana Weather Intelligence</h1>
+            <p>
+                Explore hourly weather forecasts and ask
+                questions about cities and towns across Ghana.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    ghana_now = datetime.now(
+        ZoneInfo(GHANA_TIMEZONE)
+    )
+
+    st.caption(
+        "🇬🇭 Ghana local time: "
+        + ghana_now.strftime(
+            "%A, %d %B %Y • %I:%M %p"
+        )
+    )
+
+
+
+    if weather_get_forecast:
+        if not weather_location:
+            st.sidebar.warning(
+                "Please enter a Ghanaian location."
+            )
+        else:
+            with st.spinner(
+                f"Retrieving hourly forecast for {weather_location}..."
+            ):
+                try:
+                    geo = get_coordinates(weather_location)
+
+                    forecast = get_hourly_forecast(
+                        geo["latitude"],
+                        geo["longitude"],
+                        weather_forecast_days,
+                    )
+
+                    st.session_state["weather_forecast_data"] = forecast
+
+                    st.session_state["weather_location_name"] = (
+                        f"{geo['name']}, "
+                        f"{geo.get('admin1', 'Ghana')}"
+                    )
+
+                    st.session_state["weather_pending_prompt"] = (
+                        f"Provide a detailed {weather_forecast_days}-day "
+                        f"weather forecast for {weather_location}, Ghana. "
+                        f"Include daily conditions, temperatures, "
+                        f"rainfall, rain probability, humidity "
+                        f"and wind speed where available."
+                    )
+
+                except (
+                    requests.RequestException,
+                    ValueError,
+                    KeyError,
+                ) as exc:
+                    st.error(str(exc))
+
+
+    # ============================================================
+    # 12. MAIN HEADER
+    # ============================================================
+
+    st.markdown(
+        """
+        <div class="hero">
+            <h1>🌤️ Ghana Weather Intelligence</h1>
+            <p>
+                Explore hourly weather forecasts and ask
+                questions about cities and towns across Ghana.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    ghana_now = datetime.now(
+        ZoneInfo(GHANA_TIMEZONE)
+    )
+
+    st.caption(
+        "🇬🇭 Ghana local time: "
+        + ghana_now.strftime(
+            "%A, %d %B %Y • %I:%M %p"
+        )
+    )
+
+
+    # ============================================================
+    # 13. DISPLAY WEATHER DASHBOARD
+    # ============================================================
+
+    if st.session_state["weather_forecast_data"]:
+
+        data = st.session_state["weather_forecast_data"]
+
+        hourly_df = prepare_hourly_dataframe(data)
+        daily_df = prepare_daily_dataframe(data)
+
+        st.markdown(
+            f"## 📍 {st.session_state["weather_location_name"]}"
+        )
+
+        current = data.get("current", {})
+
+        icon, condition = describe_weather(
+            current.get("weather_code")
+        )
+
+        st.markdown(
+            f"### {icon} Current conditions: {condition}"
+        )
+
+        metric_columns = st.columns(6)
+
+        metrics = [
+            (
+                "🌡️ Temperature",
+                current.get("temperature_2m"),
+                "°C",
+            ),
+            (
+                "🌡️ Feels like",
+                current.get("apparent_temperature"),
+                "°C",
+            ),
+            (
+                "💦 Humidity",
+                current.get("relative_humidity_2m"),
+                "%",
+            ),
+            (
+                "💧 Rainfall",
+                current.get("rain"),
+                "mm",
+            ),
+            (
+                "🌧️ Precipitation",
+                current.get("precipitation"),
+                "mm",
+            ),
+            (
+                "💨 Wind",
+                current.get("wind_speed_10m"),
+                "km/h",
+            ),
+        ]
+
+        for column, (label, value, unit) in zip(
+            metric_columns,
+            metrics,
+        ):
+            with column:
+                st.metric(
+                    label,
+                    (
+                        f"{value} {unit}"
+                        if value is not None
+                        else "N/A"
+                    ),
+                )
+
+        st.divider()
+
+        # --------------------------------------------------------
+        # DAILY FORECAST
+        # --------------------------------------------------------
+
+        st.markdown("### 📅 Daily forecast")
+
+        if not daily_df.empty:
+            daily_display = daily_df[
+                [
+                    "time",
+                    "condition",
+                    "temperature_2m_max",
+                    "temperature_2m_min",
+                    "precipitation_sum",
+                    "precipitation_probability_max",
+                    "wind_speed_10m_max",
+                ]
+            ].rename(
+                columns={
+                    "time": "📅 Date",
+                    "condition": "🌤️ Condition",
+                    "temperature_2m_max": "🌡️ Max °C",
+                    "temperature_2m_min": "🌡️ Min °C",
+                    "precipitation_sum": "💧 Rainfall mm",
+                    "precipitation_probability_max": "🌧️ Rain chance %",
+                    "wind_speed_10m_max": "💨 Wind km/h",
+                }
+            )
+
+            st.dataframe(
+                daily_display,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        # --------------------------------------------------------
+        # SELECT DAY FOR HOURLY FORECAST
+        # --------------------------------------------------------
+
+        st.markdown("### 🕒 Hourly weather forecast")
+
+        if not hourly_df.empty:
+
+            available_dates = sorted(
+                hourly_df["date"].unique()
+            )
+
+            selected_date = st.selectbox(
+                "Choose a forecast date",
+                available_dates,
+                format_func=lambda date: date.strftime(
+                    "%A, %d %B %Y"
+                ),
+            )
+
+            day_df = hourly_df[
+                hourly_df["date"] == selected_date
+            ].copy()
+
+            # ----------------------------------------------------
+            # HOURLY TABLE
+            # ----------------------------------------------------
+
+            hourly_display = day_df[
+                [
+                    "hour",
+                    "condition",
+                    "temperature_2m",
+                    "apparent_temperature",
+                    "relative_humidity_2m",
+                    "precipitation_probability",
+                    "rain",
+                    "showers",
+                    "precipitation",
+                    "cloud_cover",
+                    "wind_speed_10m",
+                    "wind_gusts_10m",
+                ]
+            ].rename(
+                columns={
+                    "hour": "🕒 Hour",
+                    "condition": "🌤️ Condition",
+                    "temperature_2m": "🌡️ Temp °C",
+                    "apparent_temperature": "🌡️ Feels like °C",
+                    "relative_humidity_2m": "💦 Humidity %",
+                    "precipitation_probability": "🌧️ Rain chance %",
+                    "rain": "💧 Rain mm",
+                    "showers": "🌦️ Showers mm",
+                    "precipitation": "🌧️ Total precipitation mm",
+                    "cloud_cover": "☁️ Cloud cover %",
+                    "wind_speed_10m": "💨 Wind km/h",
+                    "wind_gusts_10m": "🌬️ Gusts km/h",
+                }
+            )
+
+            st.dataframe(
+                hourly_display,
+                use_container_width=True,
+                hide_index=True,
+                height=420,
+            )
+
+            # ----------------------------------------------------
+            # INTERACTIVE CHARTS
+            # ----------------------------------------------------
+
+            st.markdown("### 📈 Hourly weather trends")
+
+            chart_tab1, chart_tab2, chart_tab3, chart_tab4 = (
+                st.tabs(
+                    [
+                        "🌡️ Temperature",
+                        "🌧️ Rainfall",
+                        "💦 Humidity",
+                        "💨 Wind",
+                    ]
+                )
+            )
+
+            chart_df = day_df.set_index("time")
+
+            with chart_tab1:
+                st.line_chart(
+                    chart_df[
+                        [
+                            "temperature_2m",
+                            "apparent_temperature",
+                        ]
+                    ],
+                    use_container_width=True,
+                )
+
+            with chart_tab2:
+                st.markdown("**Hourly rainfall (mm)**")
+
+                st.bar_chart(
+                    chart_df[["rain", "showers"]],
+                    use_container_width=True,
+                )
+
+                st.markdown(
+                    "**Hourly precipitation probability (%)**"
+                )
+
+                st.line_chart(
+                    chart_df[
+                        ["precipitation_probability"]
+                    ],
+                    use_container_width=True,
+                )
+
+            with chart_tab3:
+                st.line_chart(
+                    chart_df[
+                        ["relative_humidity_2m"]
+                    ],
+                    use_container_width=True,
+                )
+
+            with chart_tab4:
+                st.line_chart(
+                    chart_df[
+                        [
+                            "wind_speed_10m",
+                            "wind_gusts_10m",
+                        ]
+                    ],
+                    use_container_width=True,
+                )
+
+            # ----------------------------------------------------
+            # DAILY HUMIDITY SUMMARY
+            # ----------------------------------------------------
+
+            st.markdown(
+                "### 💦 Daily relative humidity summary"
+            )
+
+            humidity_summary = (
+                hourly_df.groupby("date")[
+                    "relative_humidity_2m"
+                ]
+                .agg(
+                    average="mean",
+                    minimum="min",
+                    maximum="max",
+                )
+                .round(1)
+                .reset_index()
+            )
+
+            humidity_summary.columns = [
+                "📅 Date",
+                "💦 Average %",
+                "💦 Minimum %",
+                "💦 Maximum %",
+            ]
+
+            st.dataframe(
+                humidity_summary,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+
+    st.divider()
+    st.markdown("## 🤖 Ask your weather assistant")
+    st.caption("Ask follow-up questions about Ghana's weather. Conversation memory is managed by LangGraph and PostgreSQL.")
+    if st.button("🔄 New Weather Conversation", key="weather_new_conversation"):
+        st.session_state["weather_messages"] = []
+        st.session_state["weather_conversation_id"] = None
+        st.session_state["weather_pending_prompt"] = None
+        st.rerun()
+    for message in st.session_state["weather_messages"]:
+        with st.chat_message(message["role"]):
+            st.markdown(format_ai_answer(message["content"]) if message["role"] == "assistant" else message["content"])
+    weather_user_prompt = st.chat_input("Ask about rainfall, temperature, humidity...", key="weather_chat_input")
+    weather_prompt = st.session_state["weather_pending_prompt"] or weather_user_prompt
+    st.session_state["weather_pending_prompt"] = None
+    if weather_prompt and weather_prompt.strip():
+        weather_prompt = weather_prompt.strip()
+        st.session_state["weather_messages"].append({"role": "user", "content": weather_prompt})
+        with st.chat_message("user"):
+            st.markdown(weather_prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("🤖 Analyzing the weather..."):
+                try:
+                    result = ask_weather_agent(weather_prompt, st.session_state["weather_conversation_id"])
+                    answer = result.get("answer", "No response was returned.")
+                    st.session_state["weather_conversation_id"] = result.get("conversation_id", st.session_state["weather_conversation_id"])
+                    st.markdown(format_ai_answer(answer))
+                    latency = result.get("execution_time_ms")
+                    if latency is not None:
+                        st.caption(f"⚡ Response time: {latency:.0f} ms")
+                    st.session_state["weather_messages"].append({"role": "assistant", "content": answer})
+                except RuntimeError as exc:
+                    st.error(str(exc))
+                except requests.Timeout:
+                    st.error("The weather agent timed out.")
+                except requests.ConnectionError:
+                    st.error("Unable to connect to the Ghana Weather API.")
+                except requests.HTTPError as exc:
+                    st.error(f"Weather API error: {exc.response.status_code if exc.response is not None else 'unknown'}")
+                except (ValueError, KeyError, TypeError):
+                    st.error("Invalid response from the weather agent.")
+    st.caption("🇬🇭 Ghana Weather Intelligence · Hourly forecasts powered by Open-Meteo · AI powered by LangGraph, FastAPI, PostgreSQL and Portkey")

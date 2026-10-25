@@ -2,3 +2,4 @@ streamlit
 requests
 httpx
 python-dotenv
+pandas>=2.2.0
